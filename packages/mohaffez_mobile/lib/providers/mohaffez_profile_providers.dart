@@ -4,23 +4,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
-/// Provider for mohaffez profile data
+/// Live provider for mohaffez profile data.
+///
+/// Booking availability can be changed by the teacher while a student has the
+/// profile open. Keeping this provider scoped to the screen prevents stale
+/// `acceptingNewBookings` values without leaving a Firestore listener alive
+/// after the profile is closed.
 final mohaffezProfileProvider =
-    FutureProvider.family<Map<String, dynamic>, String>(
-  (ref, mohaffezId) async {
-    final doc = await FirebaseFirestore.instance
+    StreamProvider.autoDispose.family<Map<String, dynamic>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
         .collection('users')
         .doc(mohaffezId)
-        .get();
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) {
+        throw Exception('المحفظ غير موجود');
+      }
 
-    if (!doc.exists) {
-      throw Exception('المحفظ غير موجود');
-    }
-
-    return {
-      ...doc.data()!,
-      'uid': doc.id,
-    };
+      return {
+        ...doc.data()!,
+        'uid': doc.id,
+      };
+    });
   },
 );
 
@@ -157,6 +163,36 @@ final availabilityProvider =
               })
           .toList();
     });
+  },
+);
+
+/// PII-free occupied intervals for the nearby booking horizon. This is only a
+/// UI optimization; the booking Cloud Function remains the conflict authority.
+final bookingCalendarProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    final now = DateTime.now().toUtc();
+    final rangeStart = DateTime.utc(now.year, now.month, now.day)
+        .subtract(const Duration(days: 2));
+    final rangeEnd = rangeStart.add(const Duration(days: 11));
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('bookingCalendar')
+        .where(
+          'dateUtc',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(rangeStart),
+        )
+        .where('dateUtc', isLessThan: Timestamp.fromDate(rangeEnd))
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .expand((doc) => (doc.data()['intervals'] as List? ?? const []))
+              .whereType<Map>()
+              .map((interval) => Map<String, dynamic>.from(interval))
+              .toList(),
+        );
   },
 );
 

@@ -21,8 +21,7 @@ final filteredSubscriptionsProvider = StreamProvider.autoDispose
 
 /// Count only — used by the home bottom nav badge.
 /// autoDispose keeps it alive only while HomeShell is mounted (always).
-final activeSubscriptionCountProvider =
-    StreamProvider.family<int, String>(
+final activeSubscriptionCountProvider = StreamProvider.family<int, String>(
   (ref, studentId) => ref
       .read(subscriptionRepositoryProvider)
       .watchActiveSubscriptionCount(studentId),
@@ -31,10 +30,18 @@ final activeSubscriptionCountProvider =
 /// One bundle for a specific teacher — used by MohaffezProfileScreen banner.
 final activeBundleForTeacherProvider = FutureProvider.autoDispose
     .family<SubscriptionModel?, ({String studentId, String mohaffezId})>(
-  (ref, params) => ref
-      .read(subscriptionRepositoryProvider)
-      .getActiveBundleForTeacher(
-        studentId: params.studentId,
-        mohaffezId: params.mohaffezId,
-      ),
+  (ref, params) =>
+      ref.read(subscriptionRepositoryProvider).getActiveBundleForTeacher(
+            studentId: params.studentId,
+            mohaffezId: params.mohaffezId,
+          ),
 );
+
+/// One bounded Firestore read while the teacher views active bundles.
+/// Search and filtering are performed locally by the screen.
+final teacherActiveBundlesProvider = FutureProvider.autoDispose
+    .family<List<TeacherActiveBundleInfo>, String>((ref, mohaffezId) {
+  return ref
+      .read(subscriptionRepositoryProvider)
+      .getTeacherActiveBundles(mohaffezId);
+});

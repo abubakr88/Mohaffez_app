@@ -265,11 +265,14 @@ export const getAdminMetrics = functions.https.onCall(async (_data, context) => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHEDULED: refresh cache every hour
+// SCHEDULED: refresh the legacy full-scan cache once per day. The incremental
+// adminInsights projection refreshes hourly and is the preferred dashboard
+// source. Keeping this daily snapshot preserves historical compatibility while
+// avoiding 24 repeated scans of payments and sessions every day.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const refreshAdminMetrics = functions.pubsub
-  .schedule('every 60 minutes')
+  .schedule('every 24 hours')
   .timeZone('Africa/Cairo')
   .onRun(async () => {
     try {

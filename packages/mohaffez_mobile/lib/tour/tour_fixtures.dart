@@ -36,13 +36,11 @@ class TourFixtures {
   static DemoStudentFixture? _student;
   static DemoTeacherFixture? _teacher;
 
-  static Future<DemoStudentFixture> loadStudent() async {
-    return _student ??= _buildStudent();
-  }
+  /// Tour fixtures are entirely local, so expose them synchronously. This
+  /// keeps guest mode independent from async loading and network state.
+  static DemoStudentFixture loadStudent() => _student ??= _buildStudent();
 
-  static Future<DemoTeacherFixture> loadTeacher() async {
-    return _teacher ??= _buildTeacher();
-  }
+  static DemoTeacherFixture loadTeacher() => _teacher ??= _buildTeacher();
 
   // ──────────────────────────────────────────────────────────────────────
   // Student fixture
@@ -50,12 +48,9 @@ class TourFixtures {
 
   static DemoStudentFixture _buildStudent() {
     final now = DateTime.now();
-    final tomorrowMorning =
-        DateTime(now.year, now.month, now.day + 1, 9, 0);
-    final inThreeDays =
-        DateTime(now.year, now.month, now.day + 3, 17, 30);
-    final inOneWeek =
-        DateTime(now.year, now.month, now.day + 7, 11, 0);
+    final tomorrowMorning = DateTime(now.year, now.month, now.day + 1, 9, 0);
+    final inThreeDays = DateTime(now.year, now.month, now.day + 3, 17, 30);
+    final inOneWeek = DateTime(now.year, now.month, now.day + 7, 11, 0);
 
     return DemoStudentFixture(
       user: const UserModel(
@@ -138,12 +133,9 @@ class TourFixtures {
   static DemoTeacherFixture _buildTeacher() {
     final now = DateTime.now();
     final today4pm = DateTime(now.year, now.month, now.day, 16, 0);
-    final tomorrow8am =
-        DateTime(now.year, now.month, now.day + 1, 8, 0);
-    final tomorrow6pm =
-        DateTime(now.year, now.month, now.day + 1, 18, 0);
-    final inTwoDays =
-        DateTime(now.year, now.month, now.day + 2, 10, 30);
+    final tomorrow8am = DateTime(now.year, now.month, now.day + 1, 8, 0);
+    final tomorrow6pm = DateTime(now.year, now.month, now.day + 1, 18, 0);
+    final inTwoDays = DateTime(now.year, now.month, now.day + 2, 10, 30);
 
     return DemoTeacherFixture(
       user: const UserModel(

@@ -2,7 +2,7 @@
 description: "Find and learn from Quran teachers near you."
 publish_to: 'none'
 
-version: 1.0.4+18
+version: 1.0.4+21
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -84,7 +84,7 @@ dependencies:
   # Media
   image_picker: ^1.1.2
   file_picker: ^8.0.0  # Web-compatible file picking
-  image_cropper: ^9.0.1  # Web-supported version
+  image_cropper: ^10.0.0+1  # Native edge-to-edge support on Android 15+
 
   # Image Processing
   flutter_image_compress: ^2.1.0

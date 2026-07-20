@@ -3,7 +3,7 @@
 // to teachers than "every other Sunday".
 //
 // For each teacher:
-//   1. Count completed, paid, on-time hafizSessions within the last 14 days.
+//   1. Count completed, paid, on-time hafizSessions within the financial cycle.
 //   2. Look up the matching tier in systemConfig.commissionTiers (by session count).
 //   3. Write { commissionRate, commissionTier, tierStats } to the user doc.
 //   4. Append a history entry under users/{teacherId}/commissionHistory.
@@ -80,7 +80,6 @@ export function computeSettlementPiastres(
   return { commissionPiastres, teacherNetPiastres };
 }
 
-const ROLLING_WINDOW_DAYS = 14;
 const TEACHER_PAGE_SIZE = 200;
 const SETTLEMENT_TIME_ZONE = "Africa/Cairo";
 const SETTLEMENT_HOUR = 0;
@@ -197,40 +196,58 @@ function addMonth(
   return { year, month: month + 1 };
 }
 
-export function nextScheduledSettlementAt(from: Date = new Date()): Date {
-  const nowInCairo = timeZoneParts(from, SETTLEMENT_TIME_ZONE);
-  const nextMonth = addMonth(nowInCairo.year, nowInCairo.month);
+function subtractMonth(
+  year: number,
+  month: number,
+): { year: number; month: number } {
+  if (month === 1) return { year: year - 1, month: 12 };
+  return { year, month: month - 1 };
+}
+
+export interface SettlementCycle {
+  start: Date;
+  end: Date;
+}
+
+/**
+ * Returns the fixed financial cycle containing [from]. Cycles run from the
+ * settlement at 00:05 Cairo time on the 1st to the 15th, then from the 15th
+ * to the 1st of the following month.
+ */
+export function settlementCycleAt(from: Date = new Date()): SettlementCycle {
+  const cairo = timeZoneParts(from, SETTLEMENT_TIME_ZONE);
+  const previousMonth = subtractMonth(cairo.year, cairo.month);
+  const nextMonth = addMonth(cairo.year, cairo.month);
+  const boundary = (year: number, month: number, day: number) =>
+    zonedDateTimeToUtc(
+      year,
+      month,
+      day,
+      SETTLEMENT_HOUR,
+      SETTLEMENT_MINUTE,
+      SETTLEMENT_TIME_ZONE,
+    );
   const candidates = [
-    zonedDateTimeToUtc(
-      nowInCairo.year,
-      nowInCairo.month,
-      1,
-      SETTLEMENT_HOUR,
-      SETTLEMENT_MINUTE,
-      SETTLEMENT_TIME_ZONE,
-    ),
-    zonedDateTimeToUtc(
-      nowInCairo.year,
-      nowInCairo.month,
-      15,
-      SETTLEMENT_HOUR,
-      SETTLEMENT_MINUTE,
-      SETTLEMENT_TIME_ZONE,
-    ),
-    zonedDateTimeToUtc(
-      nextMonth.year,
-      nextMonth.month,
-      1,
-      SETTLEMENT_HOUR,
-      SETTLEMENT_MINUTE,
-      SETTLEMENT_TIME_ZONE,
-    ),
+    boundary(previousMonth.year, previousMonth.month, 15),
+    boundary(cairo.year, cairo.month, 1),
+    boundary(cairo.year, cairo.month, 15),
+    boundary(nextMonth.year, nextMonth.month, 1),
   ].sort((a, b) => a.getTime() - b.getTime());
 
-  return (
-    candidates.find((candidate) => candidate.getTime() > from.getTime()) ??
-    candidates[candidates.length - 1]
+  const start = [...candidates]
+    .reverse()
+    .find((candidate) => candidate.getTime() <= from.getTime());
+  const end = candidates.find(
+    (candidate) => candidate.getTime() > from.getTime(),
   );
+  if (!start || !end) {
+    throw new Error("Unable to resolve settlement cycle boundaries.");
+  }
+  return { start, end };
+}
+
+export function nextScheduledSettlementAt(from: Date = new Date()): Date {
+  return settlementCycleAt(from).end;
 }
 
 interface TeacherStats {
@@ -243,15 +260,23 @@ interface TeacherStats {
 async function statsForTeacher(
   teacherId: string,
   windowStart: Date,
+  windowEnd?: Date,
 ): Promise<TeacherStats> {
   // We deliberately don't filter on isPaid in the Firestore query to keep
   // the index simple — payment-cleared check happens in-memory below.
-  const snap = await db
+  let query = db
     .collection("hafizSessions")
     .where("mohaffezId", "==", teacherId)
     .where("status", "==", "completed")
-    .where("completedAt", ">=", admin.firestore.Timestamp.fromDate(windowStart))
-    .get();
+    .where("completedAt", ">=", admin.firestore.Timestamp.fromDate(windowStart));
+  if (windowEnd) {
+    query = query.where(
+      "completedAt",
+      "<",
+      admin.firestore.Timestamp.fromDate(windowEnd),
+    );
+  }
+  const snap = await query.get();
 
   let totalRevenueEgp = 0;
   let sessionCount = 0;
@@ -325,9 +350,15 @@ async function recomputeForTeacher(
   now: Date,
   windowStart: Date,
   nextEval: Date,
-  options: { settleWallet: boolean } = { settleWallet: false },
+  options: { settleWallet: boolean; windowEnd?: Date } = {
+    settleWallet: false,
+  },
 ): Promise<void> {
-  const stats = await statsForTeacher(teacherId, windowStart);
+  const stats = await statsForTeacher(
+    teacherId,
+    windowStart,
+    options.windowEnd,
+  );
   // Tier is determined by on-time session count, not revenue.
   const tier = pickTier(tiers, stats.sessionCount);
 
@@ -346,6 +377,14 @@ async function recomputeForTeacher(
     commissionRate: tier.rate, // base tier rate (no penalty — for display)
     commissionTier: tier.id,
     tierStats: {
+      cycleRevenueEgp: stats.totalRevenueEgp,
+      sessionsInCycle: stats.sessionCount,
+      totalSessionsInCycle: stats.totalSessionsIncludingLate,
+      lateSessionsInCycle: stats.lateSessionsCount,
+      cycleStart: admin.firestore.Timestamp.fromDate(windowStart),
+      cycleEnd: admin.firestore.Timestamp.fromDate(nextEval),
+      // Compatibility fields for app versions released before cycle-based
+      // tier accounting. Their values now represent the financial cycle.
       last14dRevenueEgp: stats.totalRevenueEgp,
       sessionsLast14d: stats.sessionCount,
       totalSessionsLast14d: stats.totalSessionsIncludingLate,
@@ -376,6 +415,8 @@ async function recomputeForTeacher(
       penaltyPct, // penalty applied this cycle (0 if none)
       revenueEgp: stats.totalRevenueEgp,
       sessions: stats.sessionCount,
+      cycleStart: admin.firestore.Timestamp.fromDate(windowStart),
+      cycleEnd: admin.firestore.Timestamp.fromDate(nextEval),
       computedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -435,6 +476,46 @@ async function recomputeForTeacher(
   }
 
   await maybeNotifyTierChange(teacherId, previousTierId, tier);
+}
+
+async function resetTeacherForNewCycle(
+  teacherId: string,
+  tiers: TierConfig[],
+  now: Date,
+  cycle: SettlementCycle,
+): Promise<void> {
+  // Usually this query is empty because the job runs at the cycle boundary.
+  // Querying instead of blindly writing zero keeps retries/delayed executions
+  // from erasing sessions that already completed in the new cycle.
+  const stats = await statsForTeacher(teacherId, cycle.start, cycle.end);
+  const tier = pickTier(tiers, stats.sessionCount);
+  const cycleStats = {
+    cycleRevenueEgp: stats.totalRevenueEgp,
+    sessionsInCycle: stats.sessionCount,
+    totalSessionsInCycle: stats.totalSessionsIncludingLate,
+    lateSessionsInCycle: stats.lateSessionsCount,
+    cycleStart: admin.firestore.Timestamp.fromDate(cycle.start),
+    cycleEnd: admin.firestore.Timestamp.fromDate(cycle.end),
+    last14dRevenueEgp: stats.totalRevenueEgp,
+    sessionsLast14d: stats.sessionCount,
+    totalSessionsLast14d: stats.totalSessionsIncludingLate,
+    lateSessionsLast14d: stats.lateSessionsCount,
+    evaluatedAt: admin.firestore.Timestamp.fromDate(now),
+    nextEvalAt: admin.firestore.Timestamp.fromDate(cycle.end),
+    windowStart: admin.firestore.Timestamp.fromDate(cycle.start),
+  };
+  await db.collection("users").doc(teacherId).set(
+    {
+      commissionRate: tier.rate,
+      commissionTier: tier.id,
+      commissionPenaltyPercent: 0,
+      tierStats: cycleStats,
+      lastCommissionCycleResetAt: admin.firestore.Timestamp.fromDate(
+        cycle.start,
+      ),
+    },
+    { merge: true },
+  );
 }
 
 /**
@@ -618,14 +699,15 @@ async function settleCycleForTeacher(
 }
 
 async function runRecompute(
-  options: { settleWallet: boolean } = { settleWallet: true },
+  options: {
+    settleWallet: boolean;
+    statsCycle?: SettlementCycle;
+    resetToCycle?: SettlementCycle;
+  } = { settleWallet: true },
+  now: Date = new Date(),
 ): Promise<{ teachersProcessed: number }> {
   const tiers = await loadTiers();
-  const now = new Date();
-  const windowStart = new Date(
-    now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000,
-  );
-  const nextEval = nextScheduledSettlementAt(now);
+  const statsCycle = options.statsCycle ?? settlementCycleAt(now);
 
   let teachersProcessed = 0;
   let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined;
@@ -643,14 +725,35 @@ async function runRecompute(
 
     for (const doc of page.docs) {
       try {
+        if (options.resetToCycle) {
+          const lastReset = doc.data().lastCommissionCycleResetAt;
+          if (
+            lastReset instanceof admin.firestore.Timestamp &&
+            lastReset.toMillis() === options.resetToCycle.start.getTime()
+          ) {
+            teachersProcessed += 1;
+            continue;
+          }
+        }
         await recomputeForTeacher(
           doc.id,
           tiers,
           now,
-          windowStart,
-          nextEval,
-          options,
+          statsCycle.start,
+          statsCycle.end,
+          {
+            settleWallet: options.settleWallet,
+            windowEnd: statsCycle.end,
+          },
         );
+        if (options.resetToCycle) {
+          await resetTeacherForNewCycle(
+            doc.id,
+            tiers,
+            now,
+            options.resetToCycle,
+          );
+        }
         teachersProcessed += 1;
       } catch (err) {
         functions.logger.error("tier recompute failed for teacher", {
@@ -673,7 +776,19 @@ export const recomputeTeacherTiers = functions
   .pubsub.schedule("5 0 1,15 * *")
   .timeZone("Africa/Cairo")
   .onRun(async () => {
-    const result = await runRecompute();
+    const now = new Date();
+    const activeCycle = settlementCycleAt(now);
+    const closedCycle = settlementCycleAt(
+      new Date(activeCycle.start.getTime() - 1),
+    );
+    const result = await runRecompute(
+      {
+        settleWallet: true,
+        statsCycle: closedCycle,
+        resetToCycle: activeCycle,
+      },
+      now,
+    );
     functions.logger.info("recomputeTeacherTiers complete", result);
     return null;
   });
@@ -708,11 +823,15 @@ export async function recomputeForTeacherById(
   try {
     const tiers = await loadTiers();
     const now = new Date();
-    const windowStart = new Date(
-      now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000,
+    const cycle = settlementCycleAt(now);
+    await recomputeForTeacher(
+      teacherId,
+      tiers,
+      now,
+      cycle.start,
+      cycle.end,
+      { settleWallet: false, windowEnd: cycle.end },
     );
-    const nextEval = nextScheduledSettlementAt(now);
-    await recomputeForTeacher(teacherId, tiers, now, windowStart, nextEval);
   } catch (err) {
     functions.logger.warn("recomputeForTeacherById failed", { teacherId, err });
   }

@@ -275,6 +275,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     tx.update(reqRef, {
       status: 'accepted',
       isPaid: true,
+      notificationsAlreadySent: true,
       paidAt: FieldValue.serverTimestamp(),
       sessionId: sessionRef.id,
       subscriptionId,
@@ -304,6 +305,23 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    const studentNotifRef = db.collection('notifications').doc();
+    tx.set(studentNotifRef, {
+      userId: studentId,
+      recipientId: studentId,
+      senderId: mohaffezId,
+      title: 'تم تأكيد الحجز من المحفظة ✅',
+      body: `تم خصم ${amountEgp} ج.م وتأكيد جلستك مع ${req.mohaffezName ?? 'المحفظ'}.`,
+      type: 'session_paid_wallet',
+      isRead: false,
+      highPriority: true,
+      data: {
+        sessionId: sessionRef.id,
+        sessionRequestId,
+      },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
     return {
       success: true,
       sessionId: sessionRef.id,
@@ -316,7 +334,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Refund a session payment. Reverses the original three legs. Reason required.
+ * Refund a platform-held session payment. Reason required.
  * Admin-only — refund policy decisions don't belong on the client.
  */
 export const refundSessionPayment = functions.https.onCall(async (data, context) => {
@@ -337,10 +355,14 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
     }
     const s = sessionSnap.data()!;
 
-    if (s.paymentType !== 'wallet') {
+    const isPlatformHeldPayment =
+      s.paymentType === 'wallet' ||
+      s.paymentType === 'paymob' ||
+      s.paymentGateway === 'paymob';
+    if (!isPlatformHeldPayment) {
       throw new functions.https.HttpsError(
         'failed-precondition',
-        'session was not paid via wallet — refund manually',
+        'session was paid outside the platform - refund manually',
       );
     }
     if (s.refundedAt) {

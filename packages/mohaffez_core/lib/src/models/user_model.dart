@@ -51,10 +51,13 @@ String composeTeacherDisplayName(String name, String? honorific) {
   if (cleanHonorific.isEmpty || !teacherHonorifics.contains(cleanHonorific)) {
     return cleanName;
   }
-  if (cleanName == cleanHonorific || cleanName.startsWith('$cleanHonorific ')) {
-    return cleanName;
+  final nameWithoutHonorific = cleanName.startsWith('$cleanHonorific ')
+      ? cleanName.substring(cleanHonorific.length).trim()
+      : cleanName;
+  if (nameWithoutHonorific.isEmpty) {
+    return cleanHonorific;
   }
-  return '$cleanHonorific $cleanName';
+  return '$cleanHonorific — $nameWithoutHonorific';
 }
 
 @freezed

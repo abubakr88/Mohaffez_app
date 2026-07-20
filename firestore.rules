@@ -168,6 +168,7 @@ service cloud.firestore {
             'addressLng', 'specialization', 'name', 'honorific',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
+            'acceptingNewBookings',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
@@ -181,10 +182,20 @@ service cloud.firestore {
           ]) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['trialSessionEnabled', 'trialSessionDurationMinutes'])
+            .hasAny([
+              'acceptingNewBookings',
+              'trialSessionEnabled',
+              'trialSessionDurationMinutes'
+            ])
           ||
           (
             resource.data.role == 'mohaffez' &&
+            (
+              !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['acceptingNewBookings'])
+              ||
+              request.resource.data.acceptingNewBookings is bool
+            ) &&
             (
               !request.resource.data.diff(resource.data).affectedKeys()
                 .hasAny(['trialSessionEnabled'])
@@ -318,6 +329,13 @@ service cloud.firestore {
                       (isAuthenticated() &&
                       onlyUpdating(['timeSlots', 'updatedAt']));
         allow delete: if isOwner(userId);
+      }
+
+      // PII-free occupied intervals projected by Cloud Functions. Clients
+      // read them to hide unavailable choices; booking writes stay server-only.
+      match /bookingCalendar/{dateId} {
+        allow read: if isAuthenticated();
+        allow write: if false;
       }
 
       // ── Unavailable dates ──
@@ -571,11 +589,11 @@ service cloud.firestore {
     // ============================================
 
     match /payments/{paymentId} {
-      allow read: if isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null ||
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
-      );
+      ));
 
       allow create: if isAuthenticated() &&
                     !isSuspended() &&
@@ -686,6 +704,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /adminTeacherAnalytics/{teacherId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ============================================
     // SLOT LOCKING
     // ============================================
@@ -720,19 +743,21 @@ service cloud.firestore {
     match /promocodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if canManageFinance();
-      allow update: if isAuthenticated() &&
-                    (canManageFinance() ||
-                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow update: if canManageFinance();
       allow delete: if canManageFinance();
     }
 
     match /promoCodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if canManageFinance();
-      allow update: if isAuthenticated() &&
-                    (canManageFinance() ||
-                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow update: if canManageFinance();
       allow delete: if canManageFinance();
+
+      match /redemptions/{userId} {
+        allow read: if isAuthenticated() &&
+                    (request.auth.uid == userId || canManageFinance());
+        allow write: if false;
+      }
     }
 
     // ============================================
@@ -861,7 +886,10 @@ service cloud.firestore {
     }
 
     match /systemConfig/{configId} {
-      allow read: if configId != 'adminMetrics' || isAdmin();
+      allow read: if (
+                    configId != 'adminMetrics' &&
+                    configId != 'adminInsights'
+                  ) || isAdmin();
       allow write: if isSuperAdmin();
       allow create: if isPaymobToggleWrite(configId) &&
                     request.resource.data.keys().hasOnly([

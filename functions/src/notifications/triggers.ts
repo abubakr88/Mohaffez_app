@@ -101,6 +101,15 @@ export const onSessionRequestAccepted = functions.firestore
       // ── UPDATED: differentiate bundle vs single ─
       // ============================================
       if (afterStatus === 'awaitingpayment') {
+        // A rejected manual transfer returns the request to the payment step.
+        // The dedicated rejection notification explains what happened; sending
+        // another "payment required" push here would be misleading.
+        if (
+          !before.directPaymentRejectedAt &&
+          after.directPaymentRejectedAt
+        ) {
+          return;
+        }
         // Distinguish bundle / subscription from a plain single-session request
         const planType = asString(after.planType);
         const isBundlePlan =
@@ -244,11 +253,14 @@ export const onSessionRequestAccepted = functions.firestore
       // CASE 3: Rejected
       // ============================================
       if (afterStatus === 'rejected') {
+        const rejectionReason = asString(after.rejectionReason);
         await createAndSendNotification({
           userId: studentId,
           senderId: mohaffezId,
           title: 'تم رفض الطلب',
-          body: `للأسف، ${mohaffezName} رفض طلب الجلسة. يمكنك محاولة حجز موعد آخر.`,
+          body: rejectionReason
+            ? `للأسف، ${mohaffezName} رفض طلب الجلسة. السبب: ${rejectionReason}`
+            : `للأسف، ${mohaffezName} رفض طلب الجلسة. يمكنك محاولة حجز موعد آخر.`,
           type: 'session_rejected',
           isRead: false,
           data: {
@@ -256,6 +268,7 @@ export const onSessionRequestAccepted = functions.firestore
             mohaffezId,
             mohaffezName,
             sessionType: after.sessionType,
+            rejectionReason: rejectionReason || undefined,
           },
           highPriority: false,
         });
@@ -270,6 +283,13 @@ export const onSessionRequestAccepted = functions.firestore
       // CASE 4: Cancelled
       // ============================================
       if (afterStatus === 'cancelled') {
+        // Confirmed sessions are handled by onSessionCancelled, including the
+        // refund or penalty outcome for both parties. This trigger only owns
+        // cancellations that happen before a session exists.
+        if (asString(after.sessionId)) {
+          return;
+        }
+
         if (mohaffezId) {
           const studentName = asString(after.studentName, 'الطالب');
 

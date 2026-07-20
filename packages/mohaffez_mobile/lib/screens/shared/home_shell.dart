@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/navigation_provider.dart';
 import '../../shared/widgets/clock_skew_banner.dart';
 import '../../shared/widgets/offline_banner.dart';
+import '../../tour/tour_mode_state.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHELL DESIGN TOKENS — keep in sync with mohaffez_home.dart _DS
@@ -42,6 +43,7 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authUser = ref.watch(authStateProvider).valueOrNull;
     final userAsync = ref.watch(currentUserProvider);
+    final isTourMode = ref.watch(tourModeProvider).active;
 
     return userAsync.when(
       loading: () => const Scaffold(
@@ -79,12 +81,12 @@ class HomeShell extends ConsumerWidget {
         ),
       ),
       data: (user) {
-        if (authUser == null) {
+        if (!isTourMode && authUser == null) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
 
-        if (user == null || authUser.uid != user.uid) {
+        if (user == null || (!isTourMode && authUser!.uid != user.uid)) {
           return Directionality(
             textDirection: TextDirection.rtl,
             child: Scaffold(

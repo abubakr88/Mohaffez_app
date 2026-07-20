@@ -10,6 +10,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
+import 'teacher_active_bundle_card.dart';
 
 // Provider: all sessions between this teacher and this specific student
 final studentDetailSessionsProvider = FutureProvider.autoDispose.family<
@@ -74,6 +75,9 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
       studentProfileId: student.studentProfileId,
     );
     final sessionsAsync = ref.watch(studentDetailSessionsProvider(params));
+    final bundlesAsync = effectiveMohaffezId.isEmpty
+        ? const AsyncValue<List<TeacherActiveBundleInfo>>.data([])
+        : ref.watch(teacherActiveBundlesProvider(effectiveMohaffezId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -81,6 +85,11 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
         body: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(studentDetailSessionsProvider(params));
+            if (effectiveMohaffezId.isNotEmpty) {
+              ref.invalidate(
+                teacherActiveBundlesProvider(effectiveMohaffezId),
+              );
+            }
             await ref
                 .read(studentDetailSessionsProvider(params).future)
                 .catchError((_) => <Map<String, dynamic>>[]);
@@ -160,6 +169,18 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
               ),
 
               // ── Session list ───────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _StudentActiveBundlesSection(
+                  student: student,
+                  bundlesAsync: bundlesAsync,
+                  onRetry: effectiveMohaffezId.isEmpty
+                      ? null
+                      : () => ref.invalidate(
+                            teacherActiveBundlesProvider(effectiveMohaffezId),
+                          ),
+                ),
+              ),
+
               sessionsAsync.when(
                 data: (sessions) {
                   if (sessions.isEmpty) {
@@ -236,6 +257,85 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentActiveBundlesSection extends StatelessWidget {
+  const _StudentActiveBundlesSection({
+    required this.student,
+    required this.bundlesAsync,
+    this.onRetry,
+  });
+
+  final MohaffezStudentSummary student;
+  final AsyncValue<List<TeacherActiveBundleInfo>> bundlesAsync;
+  final VoidCallback? onRetry;
+
+  bool _belongsToStudent(TeacherActiveBundleInfo bundle) {
+    if (bundle.studentId != student.studentId) return false;
+
+    final studentProfileId = student.studentProfileId?.trim() ?? '';
+    final bundleProfileId = bundle.studentProfileId?.trim() ?? '';
+    final hasSpecificProfile =
+        studentProfileId.isNotEmpty && studentProfileId != 'self';
+
+    if (hasSpecificProfile) {
+      if (bundleProfileId.isNotEmpty) {
+        return bundleProfileId == studentProfileId;
+      }
+      return bundle.learnerName.trim() == student.studentName.trim();
+    }
+
+    return bundleProfileId.isEmpty ||
+        bundleProfileId == 'self' ||
+        bundle.learnerName.trim() == student.studentName.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return bundlesAsync.when(
+      data: (bundles) {
+        final studentBundles = bundles.where(_belongsToStudent).toList();
+        if (studentBundles.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'الباقات النشطة (${studentBundles.length})',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final bundle in studentBundles) ...[
+                TeacherActiveBundleCard(
+                  bundle: bundle,
+                  compact: true,
+                  onTap: () => showTeacherBundleDetails(context, bundle),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+        child: LinearProgressIndicator(minHeight: 2),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+        child: OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('تعذر تحميل الباقات النشطة - إعادة المحاولة'),
         ),
       ),
     );

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -67,7 +67,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+                        colors: [
+                          AppThemeConstants.primary,
+                          AppThemeConstants.primaryVariant
+                        ],
                       ),
                     ),
                     child: SafeArea(
@@ -96,7 +99,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                         '$unreadCount غير مقروءة',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.9),
+                                          color: AppThemeConstants.onPrimary
+                                              .withValues(alpha: 0.9),
                                         ),
                                       ),
                                   ],
@@ -104,7 +108,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 if (paginatedState.items.isNotEmpty)
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: AppThemeConstants.surface.withValues(alpha: 0.2),
+                                      color: AppThemeConstants.surface
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: IconButton(
@@ -258,14 +263,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Future<void> _handleNotificationTap(
       BuildContext context, NotificationModel notification) async {
     final type = notification.type;
+    final data = notification.data ?? <String, dynamic>{};
+
+    void openBookingStatus() {
+      final requestId =
+          data['requestId']?.toString() ?? data['sessionRequestId']?.toString();
+      if (requestId != null && requestId.isNotEmpty) {
+        context.push('/booking/status/$requestId');
+      } else {
+        context.push('/requests');
+      }
+    }
 
     switch (type) {
+      case 'bundle_awaiting_payment':
+        context.push('/booking/direct-payment', extra: data);
+        break;
+
       case 'payment_required':
       case 'paymentrequired':
         {
-          final Map<String, dynamic> data =
-              notification.data ?? <String, dynamic>{};
-
           final requestId = data['requestId'] as String?;
           final mohaffezId = data['mohaffezId'] as String?;
           final mohaffezName = data['mohaffezName'] as String? ??
@@ -345,7 +362,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case 'session_accepted':
       case 'sessionaccepted':
       case 'accepted':
-        context.go('/home');
+      case 'session_accepted_free':
+      case 'session_confirmed':
+      case 'sessionconfirmed':
+        openBookingStatus();
         break;
 
       case 'session_rejected':
@@ -371,8 +391,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         }
 
       case 'session_request':
+      case 'sessionRequest':
         // Navigate to pending requests
-        context.go('/mohaffez-home');
+        context.push('/pending-requests');
         break;
 
       case 'trial_session_requested':
@@ -383,6 +404,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         break;
 
       case 'assignment_updated':
+      case 'assignmentupdated':
+      case 'sessioncompleted':
         // Navigate to student assignments
         context.push('/assignments');
         break;
@@ -390,6 +413,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       // BUG-10 FIX: Handle subscription_created notification
       case 'subscription_created':
       case 'subscriptioncreated':
+      case 'subscription_session_consumed':
       case 'subscriptionsessionconsumed':
         // Navigate to active subscriptions screen so student can see their bundle
         context.push('/active-subscriptions');
@@ -398,19 +422,38 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       // FIX: Handle direct payment pending confirmation notification
       case 'directpaymentpending':
         {
-          final Map<String, dynamic> data =
-              notification.data ?? <String, dynamic>{};
-          final directPaymentRequestId = data['directPaymentRequestId'] as String?;
-          
-          if (directPaymentRequestId != null && directPaymentRequestId.isNotEmpty) {
+          final directPaymentRequestId =
+              data['directPaymentRequestId'] as String?;
+
+          if (directPaymentRequestId != null &&
+              directPaymentRequestId.isNotEmpty) {
             // Navigate directly to the specific direct payment request
-            context.push('/mohaffez/requests/confirm?directPaymentRequestId=$directPaymentRequestId');
+            context.push(
+                '/mohaffez/requests/confirm?directPaymentRequestId=$directPaymentRequestId');
           } else {
             // Fallback: navigate to all pending confirmations
             context.push('/mohaffez/requests/confirm');
           }
           break;
         }
+
+      case 'directpaymentconfirmed':
+      case 'directpaymentrejected':
+      case 'session_paid_wallet':
+      case 'payment_expired':
+        openBookingStatus();
+        break;
+
+      case 'session_cancelled':
+        context.push('/pending-requests');
+        break;
+
+      case 'session_reminder_24h':
+      case 'session_reminder_1h':
+      case 'online_session_started':
+      case 'online_session_reminder':
+        context.push('/my-sessions');
+        break;
 
       default:
         // No specific action
@@ -441,10 +484,13 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.primary : AppThemeConstants.white,
+          color:
+              isSelected ? AppThemeConstants.primary : AppThemeConstants.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.grey300,
+            color: isSelected
+                ? AppThemeConstants.primary
+                : AppThemeConstants.grey300,
           ),
           boxShadow: isSelected
               ? [
@@ -464,7 +510,9 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
+                color: isSelected
+                    ? AppThemeConstants.white
+                    : AppThemeConstants.grey700,
               ),
             ),
             if (count != null) ...[
@@ -482,7 +530,9 @@ class _FilterChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
+                    color: isSelected
+                        ? AppThemeConstants.white
+                        : AppThemeConstants.grey700,
                   ),
                 ),
               ),
@@ -520,7 +570,8 @@ class _NotificationCard extends StatelessWidget {
           color: AppThemeConstants.error,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete, color: AppThemeConstants.white, size: 28),
+        child:
+            const Icon(Icons.delete, color: AppThemeConstants.white, size: 28),
       ),
       onDismissed: (_) => onDismiss(),
       child: Card(
@@ -535,8 +586,9 @@ class _NotificationCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color:
-                  notification.isRead ? AppThemeConstants.white : color.withValues(alpha: 0.05),
+              color: notification.isRead
+                  ? AppThemeConstants.white
+                  : color.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: notification.isRead

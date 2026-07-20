@@ -24,12 +24,14 @@ class MeetingProviderPicker extends ConsumerWidget {
   final String teacherId;
   final String? selected;
   final ValueChanged<String?> onChanged;
+  final bool showValidationError;
 
   const MeetingProviderPicker({
     super.key,
     required this.teacherId,
     required this.selected,
     required this.onChanged,
+    this.showValidationError = false,
   });
 
   @override
@@ -73,53 +75,141 @@ class MeetingProviderPicker extends ConsumerWidget {
         }
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppThemeConstants.primary.withValues(alpha: 0.06),
+            color: showValidationError
+                ? AppThemeConstants.error.withValues(alpha: 0.05)
+                : AppThemeConstants.primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppThemeConstants.primary.withValues(alpha: 0.25),
+              color: showValidationError
+                  ? AppThemeConstants.error
+                  : selected != null
+                      ? AppThemeConstants.primary
+                      : AppThemeConstants.primary.withValues(alpha: 0.35),
+              width: showValidationError || selected != null ? 1.5 : 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.videocam_rounded,
-                      size: 20, color: AppThemeConstants.primary),
-                  SizedBox(width: 8),
-                  Text(
-                    'اختر منصة الاجتماع',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(
+                      Icons.forum_rounded,
+                      size: 20,
                       color: AppThemeConstants.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'اختر وسيلة التواصل',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppThemeConstants.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'كيف تريد حضور الجلسة الأونلاين؟',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppThemeConstants.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: selected != null
+                          ? AppThemeConstants.success.withValues(alpha: 0.12)
+                          : AppThemeConstants.warning.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      selected != null ? 'تم الاختيار' : 'مطلوب',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: selected != null
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.warning,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'سيُستخدم رابط المعلم على المنصة التي تختارها.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppThemeConstants.textSecondary,
-                ),
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 8.0;
+                  final itemWidth = available.length == 1
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - spacing) / 2;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: 8,
+                    children: [
+                      for (final p in available)
+                        SizedBox(
+                          width: itemWidth,
+                          child: _ProviderOption(
+                            label: p.label,
+                            icon: p.icon,
+                            color: p.color,
+                            selected: selected == p.id,
+                            onTap: () => onChanged(p.id),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              const SizedBox(height: 10),
+              Row(
                 children: [
-                  for (final p in available)
-                    _ProviderChip(
-                      label: p.label,
-                      icon: p.icon,
-                      color: p.color,
-                      selected: selected == p.id,
-                      onTap: () => onChanged(p.id),
+                  Icon(
+                    showValidationError
+                        ? Icons.error_outline_rounded
+                        : Icons.info_outline_rounded,
+                    size: 17,
+                    color: showValidationError
+                        ? AppThemeConstants.error
+                        : AppThemeConstants.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      showValidationError
+                          ? 'اختر وسيلة تواصل واحدة لإرسال الطلب.'
+                          : 'سيستخدم المعلم وسيلة التواصل التي تختارها عند بدء الجلسة.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        fontWeight: showValidationError
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                        color: showValidationError
+                            ? AppThemeConstants.error
+                            : AppThemeConstants.textSecondary,
+                      ),
                     ),
+                  ),
                 ],
               ),
             ],
@@ -130,14 +220,14 @@ class MeetingProviderPicker extends ConsumerWidget {
   }
 }
 
-class _ProviderChip extends StatelessWidget {
+class _ProviderOption extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
   final bool selected;
   final VoidCallback onTap;
 
-  const _ProviderChip({
+  const _ProviderOption({
     required this.label,
     required this.icon,
     required this.color,
@@ -152,7 +242,8 @@ class _ProviderChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: const BoxConstraints(minHeight: 54),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.14) : Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -164,20 +255,36 @@ class _ProviderChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                color: selected ? color : AppThemeConstants.textPrimary,
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected ? color : AppThemeConstants.textPrimary,
+                ),
               ),
             ),
-            if (selected) ...[
-              const SizedBox(width: 6),
-              Icon(Icons.check_circle_rounded, size: 16, color: color),
-            ],
+            const SizedBox(width: 6),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 21,
+              color: selected ? color : AppThemeConstants.grey400,
+            ),
           ],
         ),
       ),

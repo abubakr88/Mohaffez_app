@@ -2,11 +2,15 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/promo_code_model.dart';
 import '../repositories/promo_code_repository.dart';
 
 final promoCodeRepositoryProvider = Provider((ref) {
-  return PromoCodeRepository(FirebaseFirestore.instance);
+  return PromoCodeRepository(
+    FirebaseFirestore.instance,
+    FirebaseAuth.instance,
+  );
 });
 
 final promoCodeProvider =
@@ -37,6 +41,8 @@ class PromoCodeNotifier extends StateNotifier<AsyncValue<PromoCodeModel?>> {
       } else {
         state = AsyncValue.data(promoCode);
       }
+    } on PromoCodeValidationException catch (e, stack) {
+      state = AsyncValue.error(e.message, stack);
     } catch (e, stack) {
       state = AsyncValue.error('حدث خطأ في التحقق من الكود', stack);
     }

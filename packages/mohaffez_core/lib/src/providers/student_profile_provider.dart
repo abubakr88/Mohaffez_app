@@ -35,4 +35,4 @@ final activeStudentProfileProvider =
     loading: () => const AsyncLoading(),
     error: (error, stackTrace) => AsyncError(error, stackTrace),
   );
-});
+}, dependencies: [currentUserProvider, studentProfilesProvider]);

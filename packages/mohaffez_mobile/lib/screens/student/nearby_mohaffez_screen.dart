@@ -510,7 +510,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         _SetupChoiceCard(
           title: 'معلم',
           subtitle: 'اعرض المعلمين فقط.',
-          icon: Icons.male_rounded,
+          icon: Icons.man_rounded,
           selected: _pendingGender == TeacherGenderFilter.male,
           onTap: () => setState(() {
             _pendingGender = TeacherGenderFilter.male;
@@ -520,7 +520,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         _SetupChoiceCard(
           title: 'معلمة',
           subtitle: 'اعرض المعلمات فقط.',
-          icon: Icons.female_rounded,
+          icon: Icons.woman_rounded,
           selected: _pendingGender == TeacherGenderFilter.female,
           onTap: () => setState(() {
             _pendingGender = TeacherGenderFilter.female;
@@ -1413,7 +1413,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   ),
                                   _FilterOptionChip(
                                     label: 'معلم',
-                                    icon: Icons.male_rounded,
+                                    icon: Icons.man_rounded,
                                     isSelected: tempGenderFilter ==
                                         TeacherGenderFilter.male,
                                     onTap: () => setSheetState(() {
@@ -1423,7 +1423,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   ),
                                   _FilterOptionChip(
                                     label: 'معلمة',
-                                    icon: Icons.female_rounded,
+                                    icon: Icons.woman_rounded,
                                     isSelected: tempGenderFilter ==
                                         TeacherGenderFilter.female,
                                     onTap: () => setSheetState(() {

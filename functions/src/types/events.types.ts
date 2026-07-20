@@ -5,6 +5,7 @@ export enum PaymentEventType {
   PAYMENT_FAILED = 'payment_failed',
   WEBHOOK_RECEIVED = 'webhook_received',
   SUBSCRIPTION_CREATED = 'subscription_created',
+  SUBSCRIPTION_REPAIRED = 'subscription_repaired',
   BOOKING_CONFIRMED = 'booking_confirmed',
 }
 

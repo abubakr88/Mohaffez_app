@@ -42,10 +42,11 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
   }
 
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: firebaseOptions);
-      debugPrint('✅ Firebase initialized');
-    }
+    // Initialize directly instead of reading Firebase.apps first. On a first
+    // visit, some iOS WebKit versions can expose the JS app registry as null
+    // until Firebase Core has initialized, causing a fatal null-check error.
+    await Firebase.initializeApp(options: firebaseOptions);
+    debugPrint('✅ Firebase initialized');
 
     if (kIsWeb) {
       const recaptchaKey = String.fromEnvironment(
@@ -53,10 +54,12 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
         defaultValue: '',
       );
       if (recaptchaKey.isNotEmpty) {
-        await FirebaseAppCheck.instance.activate(
-          webProvider: ReCaptchaV3Provider(recaptchaKey),
-        );
-        debugPrint('✅ Firebase App Check activated for web');
+        await _runStartupStep('firebase-app-check', () async {
+          await FirebaseAppCheck.instance.activate(
+            webProvider: ReCaptchaV3Provider(recaptchaKey),
+          );
+          debugPrint('✅ Firebase App Check activated for web');
+        });
       } else {
         debugPrint(
           'ℹ️ Firebase App Check skipped for web: APP_CHECK_RECAPTCHA_KEY is empty',

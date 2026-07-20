@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/broadcast_model.dart';
 import '../repositories/admin_repository.dart';
+import '../utils/admin_user_search.dart';
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   return AdminRepository(FirebaseFirestore.instance);
@@ -198,11 +199,12 @@ class AdminUsersListResult {
   });
 }
 
-/// Server-side filtered stream — applies role/status filters via Firestore .where()
-/// Text search is applied to the loaded page across name, uid, email and phone.
+/// Server-side filtered stream — applies role/status filters via Firestore .where().
+/// Text search covers identity fields and the teacher pricing search projection.
 final filteredUsersProvider =
     StreamProvider.autoDispose<AdminUsersListResult>((ref) {
   final filter = ref.watch(userFilterProvider);
+  final searchTerms = adminUserSearchTerms(filter.searchQuery);
 
   Query<Map<String, dynamic>> query =
       FirebaseFirestore.instance.collection('users').orderBy('name');
@@ -214,27 +216,23 @@ final filteredUsersProvider =
     query = query.where('status', isEqualTo: filter.statusFilter);
   }
 
+  if (searchTerms.isNotEmpty) {
+    return Stream.fromFuture(
+      _searchAdminUsers(
+        baseQuery: query,
+        filter: filter,
+        searchTerms: searchTerms,
+      ),
+    );
+  }
+
   return query.limit(filter.pageSize + 1).snapshots().map((snap) {
     final docs = snap.docs;
     final hasMore = docs.length > filter.pageSize;
-    var users = docs
+    final users = docs
         .take(filter.pageSize)
         .map((d) => {'id': d.id, ...d.data()})
         .toList();
-
-    final queryText = filter.searchQuery.trim().toLowerCase();
-    if (queryText.isNotEmpty) {
-      users = users.where((u) {
-        final name = (u['name'] as String? ?? '').toLowerCase();
-        final uid = (u['id'] as String? ?? '').toLowerCase();
-        final email = (u['email'] as String? ?? '').toLowerCase();
-        final phone = (u['phoneNumber'] as String? ?? '').toLowerCase();
-        return name.contains(queryText) ||
-            uid.contains(queryText) ||
-            email.contains(queryText) ||
-            phone.contains(queryText);
-      }).toList();
-    }
 
     return AdminUsersListResult(
       users: users,
@@ -244,6 +242,77 @@ final filteredUsersProvider =
     );
   });
 });
+
+Future<AdminUsersListResult> _searchAdminUsers({
+  required Query<Map<String, dynamic>> baseQuery,
+  required UserFilterState filter,
+  required List<String> searchTerms,
+}) async {
+  final usersCollection = FirebaseFirestore.instance.collection('users');
+  final shouldSearchPricing =
+      filter.roleFilter == null || filter.roleFilter == 'mohaffez';
+
+  final baseFuture = baseQuery.limit(filter.pageSize + 1).get();
+  final pricingFuture = shouldSearchPricing
+      ? usersCollection
+          .where(
+            'pricingSearchKeywords',
+            arrayContains: strongestAdminUserSearchTerm(searchTerms),
+          )
+          .limit(filter.pageSize + 1)
+          .get()
+      : null;
+
+  final baseSnapshot = await baseFuture;
+  final pricingSnapshot = await pricingFuture;
+  final candidates = <String, Map<String, dynamic>>{};
+
+  for (final doc in baseSnapshot.docs.take(filter.pageSize)) {
+    candidates[doc.id] = {'id': doc.id, ...doc.data()};
+  }
+
+  if (pricingSnapshot != null) {
+    for (final doc in pricingSnapshot.docs.take(filter.pageSize)) {
+      final user = {'id': doc.id, ...doc.data()};
+      if (!_matchesAdminFilters(user, filter)) continue;
+      candidates[doc.id] = user;
+    }
+  }
+
+  final users = candidates.values
+      .where((user) => matchesAdminUserSearch(user, searchTerms))
+      .toList()
+    ..sort((a, b) {
+      final aName = (a['name'] as String? ?? '').toLowerCase();
+      final bName = (b['name'] as String? ?? '').toLowerCase();
+      final byName = aName.compareTo(bName);
+      if (byName != 0) return byName;
+      return (a['id'] as String).compareTo(b['id'] as String);
+    });
+
+  final baseHasMore = baseSnapshot.docs.length > filter.pageSize;
+  final pricingHasMore =
+      pricingSnapshot != null && pricingSnapshot.docs.length > filter.pageSize;
+
+  return AdminUsersListResult(
+    users: users,
+    hasMore: baseHasMore || pricingHasMore,
+    loadedCount: candidates.length,
+  );
+}
+
+bool _matchesAdminFilters(
+  Map<String, dynamic> user,
+  UserFilterState filter,
+) {
+  if (filter.roleFilter != null && user['role'] != filter.roleFilter) {
+    return false;
+  }
+  if (filter.statusFilter != null && user['status'] != filter.statusFilter) {
+    return false;
+  }
+  return true;
+}
 
 final pendingCredentialsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
@@ -515,45 +584,83 @@ class TeacherRanking {
 }
 
 /// Top teachers by completed-session count over the last [days] days.
-/// Aggregates `hafizSessions` client-side using the denormalized
-/// `mohaffezName` / `sessionPrice` fields (no user join needed).
+/// Uses the low-cost rolling projection only after it contains a full window.
+/// Until then, the legacy query preserves historical accuracy for existing
+/// installations instead of displaying a partially populated leaderboard.
 final topTeachersProvider = FutureProvider.autoDispose
     .family<List<TeacherRanking>, int>((ref, days) async {
-  final cutoff = DateTime.now().subtract(Duration(days: days));
-  final snap = await FirebaseFirestore.instance
+  final safeDays = switch (days) {
+    90 => 90,
+    365 => 365,
+    _ => 30,
+  };
+  final countField = 'rolling${safeDays}dCompletedSessions';
+  final revenueField = 'rolling${safeDays}dRevenueEgp';
+  final insights = await FirebaseFirestore.instance
+      .collection('systemConfig')
+      .doc('adminInsights')
+      .get();
+  final projectionStart = insights.data()?['projectionStartedAt'];
+  final projectionAgeDays = projectionStart is Timestamp
+      ? DateTime.now().difference(projectionStart.toDate()).inDays
+      : 0;
+
+  if (projectionAgeDays >= safeDays) {
+    final snap = await FirebaseFirestore.instance
+        .collection('adminTeacherAnalytics')
+        .orderBy(countField, descending: true)
+        .limit(10)
+        .get();
+
+    return snap.docs
+        .map((doc) {
+          final data = doc.data();
+          return TeacherRanking(
+            mohaffezId: doc.id,
+            name: data['teacherName'] as String? ?? doc.id,
+            sessionCount: (data[countField] as num?)?.toInt() ?? 0,
+            revenue: (data[revenueField] as num?)?.toDouble() ?? 0,
+          );
+        })
+        .where((ranking) => ranking.sessionCount > 0)
+        .toList();
+  }
+
+  final cutoff = DateTime.now().subtract(Duration(days: safeDays));
+  final sessions = await FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('status', isEqualTo: 'completed')
       .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
       .get();
-
   final counts = <String, int>{};
   final revenue = <String, double>{};
   final names = <String, String>{};
 
-  for (final doc in snap.docs) {
-    final d = doc.data();
-    final id = d['mohaffezId'] as String?;
-    if (id == null || id.isEmpty) continue;
-    counts[id] = (counts[id] ?? 0) + 1;
-    revenue[id] =
-        (revenue[id] ?? 0) + ((d['sessionPrice'] as num?)?.toDouble() ?? 0);
-    final name = d['mohaffezName'] as String?;
-    if (name != null && name.isNotEmpty) names[id] = name;
+  for (final doc in sessions.docs) {
+    final data = doc.data();
+    final teacherId = data['mohaffezId'] as String?;
+    if (teacherId == null || teacherId.isEmpty) continue;
+    counts[teacherId] = (counts[teacherId] ?? 0) + 1;
+    revenue[teacherId] = (revenue[teacherId] ?? 0) +
+        ((data['sessionPrice'] as num?)?.toDouble() ?? 0);
+    final teacherName = data['mohaffezName'] as String?;
+    if (teacherName != null && teacherName.isNotEmpty) {
+      names[teacherId] = teacherName;
+    }
   }
 
   final rankings = counts.entries
-      .map((e) => TeacherRanking(
-            mohaffezId: e.key,
-            name: names[e.key] ?? e.key,
-            sessionCount: e.value,
-            revenue: revenue[e.key] ?? 0,
+      .map((entry) => TeacherRanking(
+            mohaffezId: entry.key,
+            name: names[entry.key] ?? entry.key,
+            sessionCount: entry.value,
+            revenue: revenue[entry.key] ?? 0,
           ))
       .toList()
-    ..sort((a, b) {
-      final byCount = b.sessionCount.compareTo(a.sessionCount);
-      return byCount != 0 ? byCount : b.revenue.compareTo(a.revenue);
+    ..sort((left, right) {
+      final byCount = right.sessionCount.compareTo(left.sessionCount);
+      return byCount != 0 ? byCount : right.revenue.compareTo(left.revenue);
     });
-
   return rankings.take(10).toList();
 });
 

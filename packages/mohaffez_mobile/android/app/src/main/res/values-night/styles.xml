@@ -10,15 +10,7 @@
     <style name="NormalTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
-    <!-- Native image cropper screen. Keep it out of system bars so crop
-         controls are reachable on Android devices with edge-to-edge UI. -->
+    <!-- Native image cropper screen. uCrop 2.2.11+ handles system-bar insets. -->
     <style name="MohaffezCropperTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowFullscreen">false</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="android:statusBarColor">#095752</item>
-        <item name="android:navigationBarColor">#111827</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>

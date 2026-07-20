@@ -23,9 +23,8 @@ class SubscriptionRepository {
     }
 
     return query.snapshots().map(
-          (snap) => snap.docs
-              .map((d) => SubscriptionModel.fromFirestore(d))
-              .toList(),
+          (snap) =>
+              snap.docs.map((d) => SubscriptionModel.fromFirestore(d)).toList(),
         );
   }
 
@@ -63,17 +62,42 @@ class SubscriptionRepository {
       query = query.where('sessionType', isEqualTo: sessionType);
     }
 
-    final snap = await query
-        .orderBy('createdAt', descending: true)
-        .limit(1)
-        .get();
+    final snap =
+        await query.orderBy('createdAt', descending: true).limit(1).get();
 
     if (snap.docs.isEmpty) return null;
     return SubscriptionModel.fromFirestore(snap.docs.first);
   }
+
+  /// Loads the teacher's current bundle entitlements in one bounded read.
+  /// Sorting and expiry checks stay client-side to avoid an extra composite
+  /// index and repeated queries for search/filter changes.
+  Future<List<TeacherActiveBundleInfo>> getTeacherActiveBundles(
+    String mohaffezId, {
+    int limit = 50,
+  }) async {
+    final snapshot = await _firestore
+        .collection('subscriptions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'active')
+        .limit(limit)
+        .get()
+        .timeout(const Duration(seconds: 15));
+
+    final bundles = snapshot.docs
+        .map(TeacherActiveBundleInfo.fromFirestore)
+        .where((bundle) => bundle.remainingSessions > 0 && !bundle.isExpired)
+        .toList();
+
+    bundles.sort((a, b) {
+      final aDate = a.createdAt ?? a.startDate ?? DateTime(0);
+      final bDate = b.createdAt ?? b.startDate ?? DateTime(0);
+      return bDate.compareTo(aDate);
+    });
+    return bundles;
+  }
 }
 
-final subscriptionRepositoryProvider =
-    Provider<SubscriptionRepository>((ref) {
+final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
   return SubscriptionRepository(FirebaseFirestore.instance);
 });

@@ -141,6 +141,7 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
       title: request['studentName'] as String? ?? 'طالب',
       status: status,
       sessionType: request['sessionType'] as String? ?? 'online',
+      preferredProvider: request['preferredProvider'] as String?,
       durationMinutes: (request['durationMinutes'] as num?)?.toInt() ?? 30,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,44 +307,71 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
   }
 
   Future<void> _reject(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    var reason = '';
+    final rejectionReason = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('رفض الطلب'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'سبب الرفض',
-            hintText: 'اكتب سببًا مختصرًا للطالب',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('رفض الموعد المقترح'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'أخبر الطالب بسبب الرفض، واكتب موعدًا أو فترة مناسبة لك حتى يتمكن من إرسال طلب جديد.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                autofocus: true,
+                maxLines: 3,
+                maxLength: 300,
+                onChanged: (value) {
+                  setDialogState(() => reason = value.trim());
+                },
+                decoration: const InputDecoration(
+                  labelText: 'سبب الرفض والموعد المناسب',
+                  hintText:
+                      'مثال: الموعد غير مناسب، أفضّل غدًا من 5 إلى 7 مساءً',
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'لن تُحسب هذه المحاولة كحلقة تجريبية، ويمكن للطالب طلب موعد آخر.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('تراجع'),
+            ),
+            ElevatedButton(
+              onPressed: reason.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, reason),
+              child: const Text('رفض وإرسال الاقتراح'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('تراجع'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('رفض'),
-          ),
-        ],
       ),
     );
-    if (confirmed != true || !context.mounted) {
-      controller.dispose();
-      return;
-    }
+    if (rejectionReason == null || !context.mounted) return;
     try {
       await ref.read(trialSessionActionsProvider.notifier).reject(
             requestId: request['id'] as String,
-            reason: controller.text.trim(),
+            reason: rejectionReason,
           );
-    } catch (_) {
-      if (context.mounted) _message(context, 'تعذر رفض الطلب.');
-    } finally {
-      controller.dispose();
+      if (context.mounted) {
+        _message(context, 'تم رفض الموعد وإرسال اقتراحك للطالب.');
+      }
+    } on FirebaseFunctionsException catch (error) {
+      if (context.mounted) {
+        _message(context, error.message ?? 'تعذر رفض الطلب.');
+      }
     }
   }
 }
@@ -361,6 +389,7 @@ class _StudentTrialRequestCard extends ConsumerWidget {
       title: request['mohaffezName'] as String? ?? 'المحفظ',
       status: status,
       sessionType: request['sessionType'] as String? ?? 'online',
+      preferredProvider: request['preferredProvider'] as String?,
       durationMinutes: (request['durationMinutes'] as num?)?.toInt() ?? 30,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,6 +421,21 @@ class _StudentTrialRequestCard extends ConsumerWidget {
               const SizedBox(height: 10),
               _TerminalStatusMessage(message: terminalMessage),
             ],
+          ] else if (status == 'rejected_teacher') ...[
+            _TeacherRejectionMessage(
+              reason: request['rejectionReason'] as String? ?? '',
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => context.push(
+                  '/mohaffez/${request['mohaffezId']}',
+                ),
+                icon: const Icon(Icons.refresh),
+                label: const Text('طلب موعد آخر'),
+              ),
+            ),
           ] else if (request['rejectionReason'] != null)
             Text('السبب: ${request['rejectionReason']}'),
         ],
@@ -431,6 +475,7 @@ class _TrialCard extends StatelessWidget {
     required this.title,
     required this.status,
     required this.sessionType,
+    this.preferredProvider,
     required this.durationMinutes,
     required this.child,
   });
@@ -438,6 +483,7 @@ class _TrialCard extends StatelessWidget {
   final String title;
   final String status;
   final String sessionType;
+  final String? preferredProvider;
   final int durationMinutes;
   final Widget child;
 
@@ -482,6 +528,12 @@ class _TrialCard extends StatelessWidget {
                   icon: _sessionIcon(sessionType),
                   label: _sessionLabel(sessionType),
                 ),
+                if (sessionType == 'online' &&
+                    preferredProvider?.isNotEmpty == true)
+                  _InfoChip(
+                    icon: _providerIcon(preferredProvider!),
+                    label: _providerLabel(preferredProvider!),
+                  ),
                 const _InfoChip(
                   icon: Icons.money_off,
                   label: 'مجانًا',
@@ -568,6 +620,46 @@ class _TerminalStatusMessage extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(message),
+    );
+  }
+}
+
+class _TeacherRejectionMessage extends StatelessWidget {
+  const _TeacherRejectionMessage({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppThemeConstants.warning.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'اقتراح المحفظ لموعد آخر',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(reason.isEmpty ? 'يرجى اختيار موعد آخر.' : reason),
+          const SizedBox(height: 6),
+          const Text(
+            'لم تُحسب هذه المحاولة كحلقة تجريبية.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppThemeConstants.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -770,6 +862,27 @@ IconData _sessionIcon(String type) {
     default:
       return Icons.videocam_outlined;
   }
+}
+
+String _providerLabel(String provider) {
+  switch (provider) {
+    case 'zoom':
+      return 'Zoom';
+    case 'googleMeet':
+      return 'Google Meet';
+    case 'teams':
+      return 'Microsoft Teams';
+    case 'phoneCall':
+      return 'مكالمة هاتفية';
+    default:
+      return 'وسيلة اتصال أونلاين';
+  }
+}
+
+IconData _providerIcon(String provider) {
+  return provider == 'phoneCall'
+      ? Icons.phone_outlined
+      : Icons.video_call_outlined;
 }
 
 void _message(BuildContext context, String message) {

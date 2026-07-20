@@ -129,6 +129,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -157,6 +158,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileGender: studentProfileGender,
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
+        sessionDurationMinutes: sessionDurationMinutes,
       );
 
       if (result.isSuccess) {
@@ -219,6 +221,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -264,6 +267,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileGender: studentProfileGender,
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
+        sessionDurationMinutes: sessionDurationMinutes,
       );
 
       if (result.isSuccess) {
@@ -395,6 +399,7 @@ class BookingService {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     try {
       final authError = await _ensureAuthenticatedForCallable('FREE SESSION');
@@ -434,6 +439,8 @@ class BookingService {
           'studentProfileBirthDate':
               studentProfileBirthDate.toUtc().toIso8601String(),
         if (studentAge != null) 'studentAge': studentAge,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
         'slotDate': slotDate.toUtc().toIso8601String(),
@@ -496,8 +503,12 @@ class BookingService {
         case 'not-found':
           errorMessage = 'كود الخصم غير صحيح';
           break;
+        case 'already-exists':
+          errorMessage = e.message ??
+              'لقد استخدمت كود الخصم من قبل، ولا يمكن استخدامه أكثر من مرة.';
+          break;
         case 'failed-precondition':
-          errorMessage = 'لا يمكن إتمام العملية في الوقت الحالي';
+          errorMessage = e.message ?? 'لا يمكن إتمام العملية في الوقت الحالي';
           break;
         case 'deadline-exceeded':
           errorMessage = 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى';
@@ -554,6 +565,7 @@ class BookingService {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
@@ -633,6 +645,8 @@ class BookingService {
         'paymentAmount': paymentAmount,
         'sessionsCount': sessionsCount,
         'planType': planType,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 
@@ -804,11 +818,6 @@ class BookingService {
 
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
-      // ignore: unused_local_variable
-      String? notifyMohaffezId;
-      String? notifyStudentId;
-      String? notifyStudentName;
-
       await _firestore.runTransaction((transaction) async {
         final requestRef =
             _firestore.collection('sessionRequests').doc(requestId);
@@ -829,9 +838,6 @@ class BookingService {
           throw Exception('Cannot cancel completed session');
         }
 
-        notifyStudentId = requestData['studentId'] as String?;
-        notifyMohaffezId = requestData['mohaffezId'] as String?;
-        notifyStudentName = requestData['studentName'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
         final mohaffezId = requestData['mohaffezId'] as String?;
         final slotDate = requestData['slotDate'] as Timestamp?;
@@ -881,21 +887,6 @@ class BookingService {
               });
             }
           }
-        }
-
-        if (mohaffezId != null && notifyStudentId != null) {
-          final notifRef = _firestore.collection('notifications').doc();
-          transaction.set(notifRef, {
-            'userId': mohaffezId,
-            'recipientId': mohaffezId,
-            'senderId': notifyStudentId,
-            'title': 'تم إلغاء طلب الحجز',
-            'body': 'قام $notifyStudentName بإلغاء طلب الحجز',
-            'type': 'sessionCancelled',
-            'isRead': false,
-            'requestId': requestId,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
         }
       });
 

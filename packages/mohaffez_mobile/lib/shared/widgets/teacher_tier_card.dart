@@ -1,7 +1,8 @@
 // Compact card the teacher sees on home/profile showing their current
 // commission tier, current rate, and a progress bar towards the next tier.
 //
-// Tier data is recomputed bi-weekly (1st and 15th) by the Cloud Function
+// Tier data is counted within fixed financial cycles (1st-15th and
+// 15th-1st) by the Cloud Function
 // `recomputeTeacherTiers` — until that runs at least once for a teacher,
 // the card shows the global rate with a neutral "we're still calculating"
 // caption instead of incorrect tier info.
@@ -32,10 +33,11 @@ class TeacherTierCard extends ConsumerWidget {
     final effective = info?.effectiveRate(starterRate) ?? starterRate;
     final currentTier = info?.currentTier(tiers);
     final nextTier = info?.nextTier(tiers);
-    final sessions = info?.sessionsLast14d ?? 0;
-    final lateSessions = info?.lateSessionsLast14d ?? 0;
-    final totalSessions = info?.totalSessionsLast14d ?? sessions;
-    final notYetEvaluated = info?.evaluatedAt == null;
+    final sessions = info?.sessionsInCycle ?? 0;
+    final lateSessions = info?.lateSessionsInCycle ?? 0;
+    final totalSessions = info?.totalSessionsInCycle ?? sessions;
+    final notYetEvaluated =
+        info?.evaluatedAt == null || info?.cycleStart == null;
 
     final progressTowardNext = (nextTier == null || currentTier == null)
         ? null
@@ -99,7 +101,8 @@ class TeacherTierCard extends ConsumerWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -118,12 +121,12 @@ class TeacherTierCard extends ConsumerWidget {
           const SizedBox(height: 14),
           if (notYetEvaluated)
             const Text(
-              'تُحتسب شريحتك تلقائياً كل أسبوعين بناءً على حلقاتك المكتملة.',
+              'تُحتسب شريحتك تلقائياً خلال كل دورة مالية بناءً على حلقاتك المكتملة.',
               style: TextStyle(color: AppThemeConstants.white, fontSize: 12),
             )
           else ...[
             Text(
-              'أكملت $totalSessions حلقة خلال آخر 14 يوم',
+              'أكملت $totalSessions حلقة في دورة العمولة الحالية',
               style: const TextStyle(
                 color: AppThemeConstants.white,
                 fontSize: 13,
@@ -148,9 +151,10 @@ class TeacherTierCard extends ConsumerWidget {
                 child: LinearProgressIndicator(
                   value: progressTowardNext.clamp(0.0, 1.0),
                   minHeight: 8,
-                  backgroundColor: AppThemeConstants.white.withValues(alpha: 0.25),
-                  valueColor: const AlwaysStoppedAnimation(
-                      AppThemeConstants.white),
+                  backgroundColor:
+                      AppThemeConstants.white.withValues(alpha: 0.25),
+                  valueColor:
+                      const AlwaysStoppedAnimation(AppThemeConstants.white),
                 ),
               ),
               const SizedBox(height: 8),

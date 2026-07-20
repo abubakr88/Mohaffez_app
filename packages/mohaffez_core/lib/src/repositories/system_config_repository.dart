@@ -25,6 +25,14 @@ class SystemConfigRepository {
     });
   }
 
+  Future<SystemConfigModel> getGlobalConfig() async {
+    final doc = await _firestore.collection('systemConfig').doc('global').get();
+    if (!doc.exists || doc.data() == null) {
+      return SystemConfigModel.defaults();
+    }
+    return SystemConfigModel.fromFirestore(doc);
+  }
+
   Stream<DevModeModel> watchDevMode() {
     return _firestore
         .collection('systemConfig')

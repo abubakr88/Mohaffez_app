@@ -363,6 +363,21 @@ export const confirmBundleSession = functions.https.onCall(
         },
       });
 
+      await createAndSendNotification({
+        userId:       mohaffezId,
+        senderId:     studentId,
+        title:        'جلسة جديدة من باقة',
+        body:         `${studentName} حجز جلسة باستخدام باقته.`,
+        type:         'subscription_session_consumed',
+        highPriority: true,
+        data: {
+          subscriptionId,
+          sessionId: result.sessionId!,
+          requestId,
+          studentId,
+        },
+      });
+
       functions.logger.info('confirmBundleSession: Completed successfully', {
         subscriptionId,
         sessionId:         result.sessionId,

@@ -3,6 +3,7 @@
 
 // Notification functions
 export { sendNotification } from "./notifications/sendNotification";
+export { onNotificationCreated } from "./notifications/onNotificationCreated";
 export { onSessionRequestAccepted } from "./notifications/triggers";
 export { onSessionRequestStatusChanged } from "./notifications/triggers";
 export {
@@ -31,6 +32,7 @@ export { releaseExpiredSlotLocks } from "./cleanup/releaseExpiredSlotLocks";
 
 export { confirmFreeSession } from "./bookings/confirmFreeSession";
 export { createSessionRequest } from "./bookings/createSessionRequest";
+export { onSessionRequestBookingCalendarChanged } from "./bookings/bookingCalendarProjection";
 export {
   createTrialSessionRequest,
   proposeTrialSessionTime,
@@ -68,9 +70,30 @@ export { checkMaintenanceMode } from "./admin/maintenanceCheck";
 export { checkVersion } from "./admin/appVersion";
 export { setAdminClaim } from "./setAdminClaim";
 export { getAdminMetrics, refreshAdminMetrics } from "./admin/metrics";
+export {
+  getAdminInsights,
+  refreshAdminInsights,
+  rolloffTeacherAnalyticsWindows,
+} from "./admin/analyticsAggregation";
+export {
+  onAnalyticsUserCreated,
+  onAnalyticsSessionRequestCreated,
+  onAnalyticsSessionRequestUpdated,
+  onAnalyticsPaymentCreated,
+  onAnalyticsPaymentUpdated,
+  onAnalyticsSessionCreated,
+  onAnalyticsSessionUpdated,
+  onAnalyticsWalletGroupCreated,
+  onAnalyticsFailedOperationCreated,
+} from "./admin/analyticsProjection";
 export { setTeacherFoundingBadge } from "./admin/teacherBadges";
+export {
+  repairMissingFreePromoBundleSubscription,
+  repairMissingPaymobBundleSubscription,
+} from "./admin/paymobBundleRepair";
+export { convertUnderageStudentToParent } from "./auth/convertUnderageStudentToParent";
 
-// Per-teacher commission tier recompute (rolling 30-day revenue → tier).
+// Per-teacher commission tier recompute for fixed financial cycles.
 export {
   recomputeTeacherTiers,
   recomputeTeacherTiersNow,

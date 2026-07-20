@@ -9,6 +9,7 @@ interface CreateNotificationParams {
   type: string;
   isRead?: boolean;
   data?: Record<string, unknown>;
+  highPriority?: boolean;
 }
 
 interface SendFcmNotificationParams {
@@ -56,6 +57,7 @@ export async function createNotification(
     body: params.body,
     type: params.type,
     isRead: params.isRead ?? false,
+    highPriority: params.highPriority ?? false,
     createdAt: FieldValue.serverTimestamp(),
     data,
     ...data,
@@ -137,26 +139,8 @@ export async function notifyAllAdmins(
 export async function createAndSendNotification(
   params: CreateAndSendNotificationParams
 ): Promise<void> {
-  const data = sanitizeNotificationData(params.data);
-
+  // onNotificationCreated owns FCM delivery for every persisted notification.
+  // Keeping push outside the caller prevents payment/booking transactions from
+  // failing or timing out because of a missing/expired device token.
   await createNotification(params);
-  const result = await sendFcmNotification({
-    userId: params.userId,
-    title: params.title,
-    body: params.body,
-    data: Object.entries(data).reduce<Record<string, string>>(
-      (acc, [key, value]) => {
-        if (value !== null) {
-          acc[key] = String(value);
-        }
-        return acc;
-      },
-      {}
-    ),
-    highPriority: params.highPriority,
-  });
-
-  if (result.sent === false) {
-    functions.logger.warn('FCM push failed', { userId: params.userId, error: result.error });
-  }
 }

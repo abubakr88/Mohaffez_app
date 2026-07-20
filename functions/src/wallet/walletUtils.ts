@@ -15,7 +15,7 @@ export type OwnerType = 'student' | 'mohaffez' | 'system';
 
 export type TxType =
   | 'topup'              // external money → user wallet (via system_topups)
-  | 'session_payment'    // student wallet → teacher wallet + system_revenue
+  | 'session_payment'    // wallet/Paymob source -> teacher pending earnings
   | 'session_refund'     // reverse of session_payment
   | 'cycle_settlement'   // teacher pending → teacher available + system_revenue
   | 'payout'             // teacher wallet → system_payouts (then bank)

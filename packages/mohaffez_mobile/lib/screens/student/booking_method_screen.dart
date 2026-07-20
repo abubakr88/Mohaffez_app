@@ -67,13 +67,21 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     context.push('/booking/select-bundle-plan');
   }
 
-  void _onNewDirectRequest() {
+  Future<void> _onNewDirectRequest() async {
     _committedPath = BookingPath.newDirectRequest;
     ref
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.newDirectRequest);
     setState(() => _navigatingAway = true);
-    context.push('/booking/direct-request');
+    await context.push('/booking/direct-request');
+    if (!mounted) return;
+
+    // Keep the selected slot when the student returns without sending. If the
+    // student later leaves this screen, its normal cleanup can reset the flow.
+    setState(() {
+      _navigatingAway = false;
+      _committedPath = null;
+    });
   }
 
   void _continueWithSelectedPlan(PricingPlanModel plan) {
@@ -235,7 +243,14 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     final selectedSinglePlan =
         selectedPlan?.type == PlanType.single ? selectedPlan : lowestPlan;
 
-    if (selectedPlan != null && activeBundle == null && !needsChildSelection) {
+    // Auto-continue only once when this screen is first opened after choosing
+    // a plan. When the user returns from the request screen, keep the selected
+    // plan visible in the booking options instead of showing an endless
+    // transition loader.
+    if (selectedPlan != null &&
+        activeBundle == null &&
+        !needsChildSelection &&
+        !_selectedPlanRouteScheduled) {
       _continueWithSelectedPlan(selectedPlan);
       return const Center(
         child: Padding(
@@ -305,7 +320,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           borderColor: AppThemeConstants.primary,
           title: 'إرسال طلب حجز جديد',
           subtitle: selectedSinglePlan != null
-              ? 'جلسة واحدة • ${PricingCountryUtils.displayPriceText(selectedSinglePlan)} • الدفع بعد القبول'
+              ? ' الدفع بعد القبول'
               : 'جلسة واحدة • الدفع بعد قبول المحفظ',
           isEnabled: !needsChildSelection,
           onTap: needsChildSelection ? null : _onNewDirectRequest,

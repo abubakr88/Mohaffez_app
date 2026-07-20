@@ -744,9 +744,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       debugPrint('🚫 Rejecting request: $requestId');
 
-      String? notifyStudentId;
-      String? notifyMohaffezName;
-
       await _firestore.runTransaction((transaction) async {
         // ══════════════════════════════════════════════════════════
         // ── READS PHASE — all reads must come before any write ────
@@ -775,9 +772,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
             requestData['timeSlot'] as String?;
         final sessionType = requestData['sessionType'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
-
-        notifyStudentId = requestData['studentId'] as String?;
-        notifyMohaffezName = requestData['mohaffezName'] as String?;
 
         // READ 2: find availability doc ref (regular query, not tracked by tx)
         DocumentReference<Map<String, dynamic>>? availRef;
@@ -837,57 +831,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         }
       });
 
-      if (notifyStudentId != null) {
-        try {
-          await _sendRejectionNotification(
-            studentId: notifyStudentId!,
-            mohaffezName: notifyMohaffezName ?? '',
-            reason: reason,
-          );
-        } catch (e) {
-          try {
-            await _firestore.collection('failedOperations').add({
-              'operationType': 'rejection-notification',
-              'requestId': requestId,
-              'studentId': notifyStudentId,
-              'error': e.toString(),
-              'timestamp': FieldValue.serverTimestamp(),
-              'retryCount': 0,
-              'status': 'pending-retry',
-            });
-          } catch (enqueueError) {
-            debugPrint(
-                'rejectRequest: failed to enqueue notification retry: $enqueueError');
-          }
-        }
-      }
-
       debugPrint('✅ Request rejected successfully');
     } catch (e) {
       debugPrint('❌ Error rejecting request: $e');
       throw Exception('Failed to reject request: $e');
-    }
-  }
-
-  Future<void> _sendRejectionNotification({
-    required String studentId,
-    required String mohaffezName,
-    String? reason,
-  }) async {
-    try {
-      await _firestore.collection('notifications').add({
-        'userId': studentId,
-        'title': 'تم رفض طلب الحجز',
-        'body':
-            '$mohaffezName اعتذر عن قبول الطلب${reason != null ? ": $reason" : ""}',
-        'type': 'session_rejected',
-        'isRead': false,
-        'mohaffezName': mohaffezName,
-        'rejectionReason': reason,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('❌ Error sending rejection notification: $e');
     }
   }
 
@@ -898,9 +845,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
     state = const AsyncValue.loading();
     try {
-      String? notifyStudentId;
-      String? notifyMohaffezId;
-
       await _firestore.runTransaction((transaction) async {
         // ══════════════════════════════════════════════════════════
         // ── READS PHASE ───────────────────────────────────────────
@@ -919,9 +863,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         if (status == 'completed') {
           throw Exception('Cannot cancel a completed session');
         }
-
-        notifyStudentId = data['studentId'] as String?;
-        notifyMohaffezId = data['mohaffezId'] as String?;
 
         final requestId = data['requestId'] as String?;
         final slotLockId = data['slotLockId'] as String?;
@@ -1007,14 +948,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         }
       });
 
-      if (notifyStudentId != null && notifyMohaffezId != null) {
-        await sendCancellationNotifications(
-          studentId: notifyStudentId!,
-          mohaffezId: notifyMohaffezId!,
-          sessionId: sessionId,
-        );
-      }
-
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -1028,13 +961,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
     state = const AsyncValue.loading();
     try {
-      String? notifyMohaffezId;
-      String? notifyStudentId;
-      // BUG FIX #2: extract the real sessionId so sendCancellationNotifications
-      // receives the hafizSession ID, not the request ID. Fall back to requestId
-      // only when no session has been created yet (pre-payment cancellation).
-      String? linkedSessionId;
-
       await _firestore.runTransaction((transaction) async {
         // ══════════════════════════════════════════════════════════
         // ── READS PHASE ───────────────────────────────────────────
@@ -1054,11 +980,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         if (status == 'completed') {
           throw Exception('Cannot cancel completed session');
         }
-
-        notifyStudentId = requestData['studentId'] as String?;
-        notifyMohaffezId = requestData['mohaffezId'] as String?;
-        // BUG FIX #2: read sessionId from the request document
-        linkedSessionId = requestData['sessionId'] as String?;
 
         final mohaffezId = requestData['mohaffezId'] as String?;
         final slotDate = requestData['slotDate'] as Timestamp?;
@@ -1128,16 +1049,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         }
       });
 
-      if (notifyMohaffezId != null && notifyStudentId != null) {
-        await sendCancellationNotifications(
-          studentId: notifyStudentId!,
-          mohaffezId: notifyMohaffezId!,
-          // BUG FIX #2: use the real session ID; fall back to requestId
-          // only if no session was created yet (pending-state cancellation).
-          sessionId: linkedSessionId ?? requestId,
-        );
-      }
-
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -1165,51 +1076,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
-
-  Future<void> sendCancellationNotifications({
-    required String studentId,
-    required String mohaffezId,
-    required String sessionId,
-  }) async {
-    try {
-      await _firestore.collection('notifications').add({
-        'userId': studentId,
-        'recipientId': studentId,
-        'senderId': mohaffezId,
-        'title': 'تم إلغاء الجلسة',
-        'body': 'تم إلغاء الجلسة المحجوزة',
-        'type': 'session_cancelled',
-        'isRead': false,
-        'sessionId': sessionId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      await _firestore.collection('notifications').add({
-        'userId': mohaffezId,
-        'recipientId': mohaffezId,
-        'senderId': studentId,
-        'title': 'تم إلغاء الجلسة',
-        'body': 'قام الطالب بإلغاء الجلسة المحجوزة',
-        'type': 'session_cancelled',
-        'isRead': false,
-        'sessionId': sessionId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e, stack) {
-      debugPrint(
-          'sendCancellationNotifications failed for session $sessionId: $e\n$stack');
-      try {
-        await _firestore.collection('failedOperations').add({
-          'operationType': 'cancellation-notification',
-          'sessionId': sessionId,
-          'error': e.toString(),
-          'timestamp': FieldValue.serverTimestamp(),
-          'retryCount': 0,
-          'status': 'pending-retry',
-        });
-      } catch (_) {}
-    }
-  }
 
   Future<void> updateSession(
     String sessionId,

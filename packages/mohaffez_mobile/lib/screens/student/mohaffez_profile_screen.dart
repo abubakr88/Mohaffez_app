@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -265,6 +266,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       return;
     }
     if (guardWriteInTour(ref, context)) return;
+    final profileValue =
+        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
+    if (profileValue['acceptingNewBookings'] == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('المحفظ لا يستقبل حجوزات جديدة حاليًا'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
+      return;
+    }
     if (selectedPricingPlan == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -284,8 +296,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       );
       return;
     }
-    final profileValue =
-        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
     final slotContext = _buildSlotContext(profileValue);
     final bookingFlow = ref.read(bookingFlowProvider.notifier);
     final plan = selectedPricingPlan!;
@@ -295,6 +305,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       price: plan.priceEGP,
       sessions: plan.sessionsCount,
       validityDays: plan.validityDays,
+      sessionDurationMinutes: plan.sessionDurationMinutes,
     );
     bookingFlow.setSlotContext(slotContext);
     context.push('/booking/method');
@@ -612,6 +623,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           data: (profile) {
             final videoUrl = _teacherVideoUrl(profile);
             final publicBundle = publicBundleAsync?.valueOrNull;
+            final acceptingNewBookings =
+                profile['acceptingNewBookings'] != false;
             return RefreshIndicator(
               onRefresh: () async {
                 if (_isPublicView) {
@@ -667,28 +680,33 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           ref,
                           publicCredentials: publicBundle?.credentials,
                         ),
-                        if (!_isPublicView &&
-                            profile['trialSessionEnabled'] == true) ...[
+                        if (!acceptingNewBookings) ...[
                           const SizedBox(height: 20),
-                          _buildTrialSessionSection(profile, plansAsync),
-                        ],
-                        const SizedBox(height: 20),
-                        _buildModernSessionSelector(plansAsync),
-                        const SizedBox(height: 20),
-                        KeyedSubtree(
-                          key: _pricingStepKey,
-                          child: _buildModernPricingSection(plansAsync),
-                        ),
-                        const SizedBox(height: 20),
-                        KeyedSubtree(
-                          key: _scheduleStepKey,
-                          child: _buildModernAvailabilitySection(
-                            ref,
-                            profile,
-                            plansAsync,
-                            publicAvailability: publicBundle?.availability,
+                          _buildBookingsPausedNotice(),
+                        ] else ...[
+                          if (!_isPublicView &&
+                              profile['trialSessionEnabled'] == true) ...[
+                            const SizedBox(height: 20),
+                            _buildTrialSessionSection(profile, plansAsync),
+                          ],
+                          const SizedBox(height: 20),
+                          _buildModernSessionSelector(plansAsync),
+                          const SizedBox(height: 20),
+                          KeyedSubtree(
+                            key: _pricingStepKey,
+                            child: _buildModernPricingSection(plansAsync),
                           ),
-                        ),
+                          const SizedBox(height: 20),
+                          KeyedSubtree(
+                            key: _scheduleStepKey,
+                            child: _buildModernAvailabilitySection(
+                              ref,
+                              profile,
+                              plansAsync,
+                              publicAvailability: publicBundle?.availability,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -1079,6 +1097,55 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  Widget _buildBookingsPausedNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.warning.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppThemeConstants.warning.withValues(alpha: 0.35),
+          ),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.event_busy_outlined,
+              color: AppThemeConstants.warning,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'الحجوزات الجديدة متوقفة مؤقتًا',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'هذا المحفظ لا يستقبل طلبات حجز أو حلقات تجريبية جديدة حاليًا. يمكنك العودة لاحقًا.',
+                    style: TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrialSessionSection(
     Map<String, dynamic> profile,
     AsyncValue<List<PricingPlanModel>> plansAsync,
@@ -1144,6 +1211,49 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
               error: (_, __) => const Text('تعذر تحميل حالة الطلب'),
               data: (request) {
+                if (request?['status'] == 'rejected_teacher') {
+                  final reason =
+                      (request?['rejectionReason'] as String?)?.trim() ?? '';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          reason.isEmpty
+                              ? 'الموعد المطلوب لم يكن مناسبًا للمحفظ. يمكنك طلب موعد آخر.'
+                              : 'اقتراح المحفظ: $reason',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _requestTrialSession(
+                            plansAsync.valueOrNull ?? const [],
+                            duration,
+                          ),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('طلب موعد آخر'),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'لم تُحسب المحاولة السابقة كحلقة تجريبية.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                        ),
+                      ),
+                    ],
+                  );
+                }
                 if (request != null) {
                   return SizedBox(
                     width: double.infinity,
@@ -1256,6 +1366,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               price: plan.priceEGP,
               sessions: plan.sessionsCount,
               validityDays: plan.validityDays,
+              sessionDurationMinutes: plan.sessionDurationMinutes,
             );
         _revealStep(_scheduleStepKey);
       },
@@ -2504,6 +2615,113 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Modern Availability/Booking Section ───────────────────────────────────
 
+  List<Map<String, dynamic>> _timeSlotsForAvailabilityDay(
+    Map<String, dynamic> day, {
+    required bool variablePlanDurationEnabled,
+  }) {
+    final schemaVersion = (day['scheduleSchemaVersion'] as num?)?.toInt() ?? 1;
+    final scheduleMode = day['scheduleMode'] as String?;
+    if (!variablePlanDurationEnabled ||
+        schemaVersion < 2 ||
+        scheduleMode != 'availabilityWindows') {
+      return List<Map<String, dynamic>>.from(day['timeSlots'] ?? const []);
+    }
+
+    final sessionTypes =
+        (day['sessionTypes'] as List?)?.whereType<String>().toSet() ??
+            const <String>{};
+    if (!sessionTypes.contains(selectedSessionType)) return const [];
+
+    final duration = selectedPricingPlan?.sessionDurationMinutes ??
+        (day['legacySessionDurationMinutes'] as num?)?.toInt() ??
+        ScheduleConstants.defaultSessionDurationMinutes;
+    final interval = (day['slotStartIntervalMinutes'] as num?)?.toInt() ??
+        ScheduleConstants.slotStartIntervalMinutes;
+    final rawExclusions = day['generatedExclusionRanges'] ??
+        day['exclusionRanges'] ??
+        const <dynamic>[];
+    final exclusions = rawExclusions is List
+        ? rawExclusions
+            .whereType<Map>()
+            .map(
+              (range) => {
+                'start': range['start']?.toString() ?? '',
+                'end': range['end']?.toString() ?? '',
+              },
+            )
+            .toList()
+        : const <Map<String, String>>[];
+
+    return ScheduleConstants.generateWindowCandidates(
+      startTime: day['startTime']?.toString() ?? '',
+      endTime: day['endTime']?.toString() ?? '',
+      durationMinutes: duration,
+      startIntervalMinutes: interval,
+      exclusionRanges: exclusions,
+    )
+        .map(
+          (slot) => <String, dynamic>{
+            'enabled': true,
+            'startTime': slot['start'],
+            'endTime': slot['end'],
+            'sessionType': selectedSessionType,
+          },
+        )
+        .toList();
+  }
+
+  DateTime? _calendarTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  bool _isCalendarIntervalOccupied({
+    required Map<String, dynamic> slot,
+    required DateTime date,
+    required Map<String, dynamic> availabilityDay,
+    required List<Map<String, dynamic>> occupiedIntervals,
+  }) {
+    final startParts = (slot['startTime'] as String? ?? '').split(':');
+    final endParts = (slot['endTime'] as String? ?? '').split(':');
+    if (startParts.length != 2 || endParts.length != 2) return true;
+    final startHour = int.tryParse(startParts[0]);
+    final startMinute = int.tryParse(startParts[1]);
+    final endHour = int.tryParse(endParts[0]);
+    final endMinute = int.tryParse(endParts[1]);
+    if (startHour == null ||
+        startMinute == null ||
+        endHour == null ||
+        endMinute == null) {
+      return true;
+    }
+
+    final candidateStart =
+        DateTime(date.year, date.month, date.day, startHour, startMinute);
+    final candidateEnd =
+        DateTime(date.year, date.month, date.day, endHour, endMinute);
+    final rawBreaks = availabilityDay['breakMinutesBySessionType'];
+    final configuredBreak = rawBreaks is Map
+        ? (rawBreaks[selectedSessionType] as num?)?.toInt()
+        : null;
+    final candidateBreak = configuredBreak ??
+        ScheduleConstants
+            .defaultBreakMinutesBySessionType[selectedSessionType] ??
+        0;
+    final candidateReservedUntil =
+        candidateEnd.add(Duration(minutes: candidateBreak));
+
+    return occupiedIntervals.any((interval) {
+      final existingStart = _calendarTimestamp(interval['slotStart']);
+      final existingReservedUntil =
+          _calendarTimestamp(interval['reservedUntil']) ??
+              _calendarTimestamp(interval['slotEnd']);
+      if (existingStart == null || existingReservedUntil == null) return false;
+      return candidateStart.isBefore(existingReservedUntil) &&
+          existingStart.isBefore(candidateReservedUntil);
+    });
+  }
+
   Widget _buildModernAvailabilitySection(
     WidgetRef ref,
     Map<String, dynamic> profile,
@@ -2519,6 +2737,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         : ref.watch(
             availabilityProvider(widget.mohaffezId),
           );
+    final variablePlanDurationEnabled = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.variablePlanSessionDurationEnabled ??
+        false;
+    final occupiedIntervals = publicAvailability != null ||
+            !variablePlanDurationEnabled
+        ? const <Map<String, dynamic>>[]
+        : ref.watch(bookingCalendarProvider(widget.mohaffezId)).valueOrNull ??
+            const <Map<String, dynamic>>[];
 
     return availability.when(
       data: (slots) {
@@ -2560,8 +2788,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Pre-filter all slots to check if any exist for selected session type
         final hasAnyFilteredSlots = slots.any((slot) {
-          final timeSlots =
-              List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
+          final timeSlots = _timeSlotsForAvailabilityDay(
+            slot,
+            variablePlanDurationEnabled: variablePlanDurationEnabled,
+          );
           return timeSlots.any((ts) =>
               ts['enabled'] == true &&
               ts['sessionType'] == selectedSessionType);
@@ -2658,8 +2888,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
                   for (final slot in sortedSlots) {
                     final dayOfWeek = slot['dayOfWeek'] as int;
-                    final timeSlots = List<Map<String, dynamic>>.from(
-                        slot['timeSlots'] ?? []);
+                    final timeSlots = _timeSlotsForAvailabilityDay(
+                      slot,
+                      variablePlanDurationEnabled: variablePlanDurationEnabled,
+                    );
                     int daysUntil = dayOfWeek - currentDayOfWeek;
                     if (daysUntil < 0) daysUntil += 7;
                     final targetDate = DateTime(
@@ -2669,6 +2901,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     final enabled = timeSlots.where((ts) {
                       if (ts['enabled'] != true) return false;
                       if (ts['sessionType'] != selectedSessionType) {
+                        return false;
+                      }
+                      if (_isCalendarIntervalOccupied(
+                        slot: ts,
+                        date: targetDate,
+                        availabilityDay: slot,
+                        occupiedIntervals: occupiedIntervals,
+                      )) {
                         return false;
                       }
                       if (isToday) {

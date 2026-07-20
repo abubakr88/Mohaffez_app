@@ -4,6 +4,13 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
 import { EventStore } from "../services/EventStore";
+import { sanitizeForFirestore } from "../utils/firestoreSanitizer";
+import {
+  buildBundleEntitlementValues,
+  isBundlePlan,
+  promoBundleSubscriptionId,
+} from "../payments/paymobBundleEntitlement";
+import { PaymentEventType } from "../types/events.types";
 
 const STATUS = {
   PENDING: 'pending',
@@ -31,6 +38,12 @@ function optionalString(value: unknown): string | null {
 
 function optionalNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function mapValue(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function optionalTimestamp(
@@ -88,13 +101,16 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     studentProfileBirthDate,
     studentAge,
   } = data;
+  const normalizedPromoCode =
+    typeof promoCode === "string" ? promoCode.trim().toUpperCase() : "";
+  const normalizedPaymentId = optionalString(paymentId);
 
   // ✅ LOG INPUT PARAMETERS
   functions.logger.info("📥 Input parameters received", {
     hasRequestId: !!requestId,
     requestId: requestId || "NOT_PROVIDED",
-    hasPaymentId: !!paymentId,
-    paymentId: paymentId || null,
+    hasPaymentId: normalizedPaymentId != null,
+    paymentId: normalizedPaymentId,
     studentId,
     mohaffezId,
     promoCode,
@@ -109,7 +125,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     !slotDate ||
     !slotStart ||
     !slotEnd ||
-    !promoCode
+    !normalizedPromoCode
   ) {
     throw new functions.https.HttpsError("invalid-argument", "بيانات غير مكتملة");
   }
@@ -142,7 +158,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     // FIX-1: Move promo code read/validation into transaction to avoid TOCTOU race
     const promoQuery = db
       .collection("promoCodes")
-      .where("code", "==", promoCode)
+      .where("code", "==", normalizedPromoCode)
       .limit(1);
     const promoSnapshot = await transaction.get(promoQuery);
 
@@ -152,12 +168,30 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
 
     const promoDoc = promoSnapshot.docs[0];
     const promoData = promoDoc.data();
+    const redemptionRef = promoDoc.ref
+      .collection("redemptions")
+      .doc(studentId);
+    const redemptionSnapshot = await transaction.get(redemptionRef);
+    const redemptionData = redemptionSnapshot.data();
+    const currentUserUseCount =
+      typeof redemptionData?.useCount === "number"
+        ? redemptionData.useCount
+        : 0;
+    const perUserLimit = 1;
 
     if (!promoData.isActive) {
       throw new functions.https.HttpsError("failed-precondition", "كود الخصم غير نشط");
     }
 
-    if (promoData.discountPercent !== 100) {
+    const discountType = promoData.type ?? promoData.discountType;
+    const discountValue =
+      promoData.discountPercent ??
+      promoData.discountValue ??
+      promoData.discount;
+    const isPercentageDiscount =
+      discountType === "percentage" || discountType === "percent";
+
+    if (!isPercentageDiscount || Number(discountValue) !== 100) {
       throw new functions.https.HttpsError(
         "failed-precondition",
         "كود الخصم يجب أن يكون 100%"
@@ -173,10 +207,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     functions.logger.info("✅ Promo code validated", {
-      promoCode,
-      discountPercent: promoData.discountPercent,
+      promoCode: normalizedPromoCode,
+      discountPercent: Number(discountValue),
       usedCount: promoData.usedCount,
       usageLimit: promoData.usageLimit,
+      perUserLimit,
+      currentUserUseCount,
     });
     functions.logger.info("🔄 Transaction started");
 
@@ -214,10 +250,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     // Check 2: By paymentId
-    if (paymentId) {
+    if (normalizedPaymentId) {
       const existingByPaymentQuery = db
         .collection("hafizSessions")
-        .where("paymentId", "==", paymentId)
+        .where("paymentId", "==", normalizedPaymentId)
         .limit(1);
       
       const existingByPayment = await transaction.get(existingByPaymentQuery);
@@ -226,7 +262,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         const session = existingByPayment.docs[0];
         const sessionData = session.data();
         functions.logger.warn("⚠️ Session already exists (paymentId check)", {
-          paymentId,
+          paymentId: normalizedPaymentId,
           sessionId: session.id,
         });
         return {
@@ -237,6 +273,155 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           message: "الجلسة موجودة بالفعل",
         };
       }
+    }
+
+    // Enforce the per-user limit only after idempotency checks. A retried
+    // successful request must return its existing session, not a false
+    // "already used" error.
+    if (
+      currentUserUseCount >= perUserLimit ||
+      (!redemptionSnapshot.exists && promoData.lastUsedBy === studentId)
+    ) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "لقد استخدمت كود الخصم من قبل، ولا يمكن استخدامه أكثر من مرة."
+      );
+    }
+
+    // The original booking request is the source of truth for the reserved
+    // slot. createSessionRequest disables that availability slot as soon as
+    // the request is created, so a disabled slot is expected here when it
+    // belongs to this exact request.
+    if (!requestId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'معرف الطلب مطلوب للجلسات المجانية'
+      );
+    }
+
+    const requestRef = db.collection('sessionRequests').doc(requestId);
+    const existingRequest = await transaction.get(requestRef);
+
+    functions.logger.info("🔍 Checking existing request document", {
+      requestId,
+      exists: existingRequest.exists,
+      status: existingRequest.exists ? existingRequest.data()?.status : "N/A",
+    });
+
+    if (!existingRequest.exists) {
+      throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
+    }
+
+    const existingRequestData = existingRequest.data()!;
+
+    if (
+      existingRequestData.studentId !== studentId ||
+      existingRequestData.mohaffezId !== mohaffezId
+    ) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'طلب الجلسة لا يخص هذا المستخدم أو المحفظ'
+      );
+    }
+
+    if (
+      existingRequestData.status === STATUS.REJECTED ||
+      existingRequestData.status === STATUS.CANCELLED
+    ) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'لا يمكن تأكيد طلب مرفوض أو ملغي'
+      );
+    }
+
+    if (
+      existingRequestData.status === STATUS.ACCEPTED &&
+      existingRequestData.sessionId
+    ) {
+      return {
+        __idempotent: true,
+        success: true,
+        sessionId: existingRequestData.sessionId,
+        requestId,
+        message: 'الجلسة مؤكدة بالفعل',
+      };
+    }
+
+    let paymentRef: FirebaseFirestore.DocumentReference | null = null;
+    let paymentData: Record<string, unknown> | null = null;
+    let paymentMetadata: Record<string, unknown> = {};
+    let bundleSubscriptionId: string | null = null;
+    let bundleSubscriptionRef: FirebaseFirestore.DocumentReference | null = null;
+
+    if (normalizedPaymentId) {
+      paymentRef = db.collection('payments').doc(normalizedPaymentId);
+      const paymentSnapshot = await transaction.get(paymentRef);
+      if (!paymentSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          'سجل الدفع المجاني غير موجود'
+        );
+      }
+
+      paymentData = paymentSnapshot.data() as Record<string, unknown>;
+      paymentMetadata = mapValue(paymentData.metadata);
+      const paymentPromoCode = optionalString(paymentMetadata.promoCode)?.toUpperCase();
+      const paymentRequestId = optionalString(
+        paymentData.requestId ?? paymentMetadata.requestId
+      );
+      const paymentAmount = optionalNumber(paymentData.amount) ?? 0;
+
+      if (
+        paymentData.studentId !== studentId ||
+        paymentData.mohaffezId !== mohaffezId ||
+        (paymentRequestId != null && paymentRequestId !== requestId) ||
+        paymentAmount > 0.01 ||
+        paymentPromoCode !== normalizedPromoCode
+      ) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'سجل الدفع لا يطابق طلب الحجز المجاني'
+        );
+      }
+
+      if (isBundlePlan(paymentMetadata, paymentData)) {
+        bundleSubscriptionId = promoBundleSubscriptionId(normalizedPaymentId);
+        bundleSubscriptionRef = db
+          .collection('subscriptions')
+          .doc(bundleSubscriptionId);
+        const bundleSubscriptionSnapshot = await transaction.get(
+          bundleSubscriptionRef
+        );
+        if (bundleSubscriptionSnapshot.exists) {
+          throw new functions.https.HttpsError(
+            'already-exists',
+            'اشتراك الباقة المجانية موجود بالفعل'
+          );
+        }
+      }
+    }
+
+    const requestSlotDate = optionalTimestamp(existingRequestData.slotDate);
+    const requestMatchesSlot =
+      normalizeTimeSlot(existingRequestData.preferredTimeSlot ?? '') ===
+        normalizeTimeSlot(preferredTimeSlot) &&
+      existingRequestData.sessionType === sessionType &&
+      requestSlotDate?.toMillis() === slotDateTimestamp.toMillis();
+
+    if (!requestMatchesSlot) {
+      functions.logger.error('confirmFreeSession: request slot mismatch', {
+        requestId,
+        requestTimeSlot: existingRequestData.preferredTimeSlot,
+        payloadTimeSlot: preferredTimeSlot,
+        requestSessionType: existingRequestData.sessionType,
+        payloadSessionType: sessionType,
+        requestSlotDate: requestSlotDate?.toDate().toISOString() ?? null,
+        payloadSlotDate: slotDateTimestamp.toDate().toISOString(),
+      });
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'بيانات الموعد لا تطابق طلب الحجز'
+      );
     }
 
     // ============================================
@@ -302,15 +487,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         }
         
         if (slotFound && !slotEnabled) {
-          functions.logger.error("❌ Slot is disabled", {
+          functions.logger.info("✅ Slot is reserved by the current request", {
             mohaffezId,
+            requestId,
             dayOfWeek,
             timeSlot: normalizedSlot,
           });
-          throw new functions.https.HttpsError(
-            "failed-precondition",
-            "هذا التوقيت غير متاح حالياً"
-          );
         }
       }
     }
@@ -318,74 +500,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     // ============================================
     // ✅ STEP 4: HANDLE REQUEST DOCUMENT
     // ============================================
-    let requestRef: FirebaseFirestore.DocumentReference;
-    let isUpdatingExisting = false;
-    let existingRequestData: FirebaseFirestore.DocumentData | undefined;
+    const isUpdatingExisting = true;
 
-    if (requestId) {
-      requestRef = db.collection('sessionRequests').doc(requestId);
-      const existingRequest = await transaction.get(requestRef);
-      
-      // ✅ LOG: Check if request exists
-      functions.logger.info("🔍 Checking existing request document", {
-        requestId,
-        exists: existingRequest.exists,
-        status: existingRequest.exists ? existingRequest.data()?.status : "N/A",
-      });
-      
-      if (!existingRequest.exists) {
-        functions.logger.error("❌ Request document not found!", {
-          requestId,
-          studentId,
-          mohaffezId,
-        });
-        throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
-      }
-      
-      const requestData = existingRequest.data();
-      existingRequestData = requestData;
-      
-      // ✅ CHECK: If already accepted
-      if (requestData && requestData.status === STATUS.ACCEPTED) {
-        const sessionId = requestData.sessionId;
-        if (sessionId) {
-          functions.logger.warn("⚠️ Request already accepted!", {
-            requestId,
-            sessionId,
-            oldStatus: requestData.status,
-          });
-          return {
-            __idempotent: true,
-            success: true,
-            sessionId: sessionId,
-            requestId: requestId,
-            message: 'الجلسة مؤكدة بالفعل'
-          };
-        }
-      }
-      
-      isUpdatingExisting = true;
-      
-      // ✅ LOG: Will update existing request
-      functions.logger.info("✅ Will UPDATE existing request", {
-        requestId,
-        currentStatus: requestData?.status,
-        isUpdatingExisting: true,
-      });
-      
-    } else {
-      // ✅ LOG: No requestId provided
-      functions.logger.error("❌ No requestId provided!", {
-        studentId,
-        mohaffezId,
-        promoCode,
-      });
-      
-      throw new functions.https.HttpsError(
-        'invalid-argument', 
-        'معرف الطلب مطلوب للجلسات المجانية'
-      );
-    }
+    functions.logger.info("✅ Will UPDATE existing request", {
+      requestId,
+      currentStatus: existingRequestData.status,
+      isUpdatingExisting,
+    });
 
     const sessionRef = db.collection("hafizSessions").doc();
     const learnerSnapshot = {
@@ -413,6 +534,113 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         optionalNumber(studentAge) ??
         optionalNumber(existingRequestData?.['studentAge']),
     };
+    const effectivePreferredProvider =
+      sessionType === 'online'
+        ? optionalString(preferredProvider) ??
+          optionalString(existingRequestData.preferredProvider)
+        : null;
+
+    const sessionDetails = mapValue(paymentMetadata.sessionDetails);
+    const planId = optionalString(paymentMetadata.planId) ??
+      optionalString(existingRequestData.planId);
+    const planTitle = optionalString(paymentMetadata.planTitle) ??
+      optionalString(existingRequestData.planTitle);
+    const sessionsCount = optionalNumber(paymentMetadata.sessionsCount) ??
+      optionalNumber(existingRequestData.sessionsCount);
+    const validityDays = optionalNumber(paymentMetadata.validityDays) ??
+      optionalNumber(existingRequestData.validityDays);
+    const sessionDurationMinutes =
+      optionalNumber(existingRequestData.sessionDurationMinutes) ??
+      optionalNumber(sessionDetails.sessionDurationMinutes) ??
+      optionalNumber(paymentMetadata.sessionDurationMinutes);
+    const isBundlePayment =
+      paymentData != null && isBundlePlan(paymentMetadata, paymentData);
+    const sessionWriteData: Record<string, unknown> = {
+      requestId: requestRef.id,
+      mohaffezId,
+      studentId,
+      mohaffezName,
+      studentName,
+      ...learnerSnapshot,
+      sessionType,
+      preferredProvider: effectivePreferredProvider,
+      location: imamAddressText || "",
+      mohaffezPhone: mohaffezPhone || null,
+      studentPhone:
+        typeof studentPhone === 'string' && studentPhone.trim().length > 0
+          ? studentPhone.trim()
+          : null,
+      imamAddressLat: imamAddressLat || null,
+      imamAddressLng: imamAddressLng || null,
+      imamAddressText: imamAddressText || null,
+      preferredTimeSlot,
+      timeSlot: preferredTimeSlot,
+      sessionDate: slotDateTimestamp,
+      slotStart: slotStartTimestamp,
+      slotEnd: slotEndTimestamp,
+      status: STATUS.ACCEPTED,
+      isPaid: true,
+      sessionPrice: 0.0,
+      promoCode: normalizedPromoCode,
+      paymentId: normalizedPaymentId,
+      ...(planId ? { planId } : {}),
+      ...(planTitle ? { planTitle } : {}),
+      ...(isBundlePayment ? { planType: 'bundle' } : {}),
+      ...(sessionsCount != null ? { sessionsCount } : {}),
+      ...(validityDays != null ? { validityDays } : {}),
+      ...(sessionDurationMinutes != null
+        ? { sessionDurationMinutes: Math.trunc(sessionDurationMinutes) }
+        : {}),
+      ...(bundleSubscriptionId ? { subscriptionId: bundleSubscriptionId } : {}),
+      createdAt: FieldValue.serverTimestamp(),
+      acceptedAt: FieldValue.serverTimestamp(),
+      reminder24hSent: false,
+      reminder1hSent: false,
+      juzCount: 1,
+      sessionRating: 10,
+    };
+
+    let bundleSubscriptionWriteData: Record<string, unknown> | null = null;
+    let bundleRemainingSessions: number | null = null;
+    if (
+      isBundlePayment &&
+      normalizedPaymentId &&
+      paymentData &&
+      bundleSubscriptionId &&
+      bundleSubscriptionRef
+    ) {
+      const entitlement = buildBundleEntitlementValues({
+        paymentId: normalizedPaymentId,
+        payment: paymentData,
+        metadata: paymentMetadata,
+        requestId: requestRef.id,
+        request: existingRequestData,
+        sessionId: sessionRef.id,
+        session: sessionWriteData,
+        transactionId: normalizedPaymentId,
+        subscriptionId: bundleSubscriptionId,
+        paymentType: 'promo',
+        paymentGateway: 'promo',
+        promoCode: normalizedPromoCode,
+      });
+      const startDate = admin.firestore.Timestamp.now();
+      const expiryDate = entitlement.validityDays == null
+        ? null
+        : admin.firestore.Timestamp.fromMillis(
+            startDate.toMillis() + entitlement.validityDays * 86400000
+          );
+      bundleRemainingSessions = entitlement.remainingSessions;
+      bundleSubscriptionWriteData = sanitizeForFirestore({
+        ...entitlement.data,
+        promoCode: normalizedPromoCode,
+        promoDiscount: 100,
+        startDate,
+        expiryDate,
+        lastUsedAt: startDate,
+        createdAt: startDate,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     // ============================================
     // ✅ STEP 5: WRITE PHASE
@@ -421,10 +649,16 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       status: STATUS.ACCEPTED,
       isPaid: true,
       paymentAmount: 0.0,
-      promoCode,
+      promoCode: normalizedPromoCode,
       promoDiscount: 100,
       notificationsAlreadySent: true,
       sessionId: sessionRef.id,
+      ...(bundleSubscriptionId
+        ? {
+            subscriptionId: bundleSubscriptionId,
+            planType: 'bundle',
+          }
+        : {}),
       ...learnerSnapshot,
       acceptedAt: FieldValue.serverTimestamp(),
       paidAt: FieldValue.serverTimestamp(),
@@ -475,44 +709,28 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     // Create hafizSession
-    transaction.set(sessionRef, {
-      requestId: requestRef.id,
-      mohaffezId,
-      studentId,
-      mohaffezName,
-      studentName,
-      ...learnerSnapshot,
-      sessionType,
-      preferredProvider:
-        sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
-          ? preferredProvider
-          : null,
-      location: imamAddressText || "",
-      mohaffezPhone: mohaffezPhone || null,
-      studentPhone:
-        typeof studentPhone === 'string' && studentPhone.trim().length > 0
-          ? studentPhone.trim()
-          : null,
-      imamAddressLat: imamAddressLat || null,
-      imamAddressLng: imamAddressLng || null,
-      imamAddressText: imamAddressText || null,
-      preferredTimeSlot,
-      timeSlot: preferredTimeSlot,
-      sessionDate: slotDateTimestamp,
-      slotStart: slotStartTimestamp,
-      slotEnd: slotEndTimestamp,
-      status: STATUS.ACCEPTED,
-      isPaid: true,
-      sessionPrice: 0.0,
-      promoCode,
-      paymentId: paymentId || null,
-      createdAt: FieldValue.serverTimestamp(),
-      acceptedAt: FieldValue.serverTimestamp(),
-      reminder24hSent: false,
-      reminder1hSent: false,
-      juzCount: 1,
-      sessionRating: 10,
-    });
+    transaction.set(sessionRef, sessionWriteData);
+
+    if (bundleSubscriptionRef && bundleSubscriptionWriteData) {
+      transaction.set(bundleSubscriptionRef, bundleSubscriptionWriteData);
+      const subscriptionEventRef = db.collection('paymentEvents').doc();
+      transaction.set(subscriptionEventRef, sanitizeForFirestore({
+        eventId: subscriptionEventRef.id,
+        eventType: PaymentEventType.SUBSCRIPTION_CREATED,
+        paymentId: normalizedPaymentId,
+        userId: studentId,
+        data: {
+          requestId: requestRef.id,
+          sessionId: sessionRef.id,
+          subscriptionId: bundleSubscriptionId,
+          totalSessions: sessionsCount,
+          remainingSessions: bundleRemainingSessions,
+          promoCode: normalizedPromoCode,
+        },
+        metadata: { source: 'client' },
+        timestamp: FieldValue.serverTimestamp(),
+      }));
+    }
 
     functions.logger.info("📝 Creating hafizSession", {
       sessionId: sessionRef.id,
@@ -520,14 +738,20 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     });
 
     // Update payment (if provided)
-    if (paymentId) {
-      const paymentRef = db.collection("payments").doc(paymentId);
+    if (paymentRef) {
       transaction.update(paymentRef, {
         status: "completed",
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         sessionId: sessionRef.id,
         notes: "Free session via promo code",
+        ...(bundleSubscriptionId
+          ? {
+              subscriptionId: bundleSubscriptionId,
+              planType: 'bundle',
+              bundleEntitlementCreatedAt: FieldValue.serverTimestamp(),
+            }
+          : {}),
       });
     }
 
@@ -537,6 +761,22 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       lastUsedAt: FieldValue.serverTimestamp(),
       lastUsedBy: studentId,
     });
+
+    transaction.set(
+      redemptionRef,
+      {
+        userId: studentId,
+        promoCodeId: promoDoc.id,
+        code: normalizedPromoCode,
+        useCount: currentUserUseCount + 1,
+        firstUsedAt:
+          redemptionData?.firstUsedAt ?? FieldValue.serverTimestamp(),
+        lastUsedAt: FieldValue.serverTimestamp(),
+        requestId: requestRef.id,
+        sessionId: sessionRef.id,
+      },
+      { merge: true }
+    );
 
     // Disable availability slot
     if (availabilityDoc) {
@@ -612,10 +852,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     functions.logger.info("✅ FREE SESSION COMPLETED SUCCESSFULLY", {
       sessionId: sessionRef.id,
       requestId: requestRef.id,
-      paymentId: paymentId || null,
+      paymentId: normalizedPaymentId,
       studentId,
       mohaffezId,
-      promoCode,
+      promoCode: normalizedPromoCode,
       isUpdatingExisting,
       operation: isUpdatingExisting ? "UPDATE" : "CREATE",
       transactionComplete: true,
@@ -625,7 +865,8 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       success: true,
       sessionId: sessionRef.id,
       requestId: requestRef.id,
-      paymentId: paymentId || null,
+      paymentId: normalizedPaymentId,
+      subscriptionId: bundleSubscriptionId,
       message: "تم إنشاء الجلسة المجانية بنجاح",
       isUpdatingExisting,  // ✅ Include in response
     };
@@ -643,74 +884,34 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     };
   }
 
-  const { createAndSendNotification } = await import('../utils/notificationHelpers');
-  try {
-    await Promise.all([
-      createAndSendNotification({
-        userId: studentId,
-        senderId: mohaffezId,
-        title: 'تم تأكيد جلستك المجانية ✅',
-        body: `جلستك مع ${mohaffezName} مؤكدة.`,
-        type: 'sessionconfirmed',
-        highPriority: true,
-        data: { sessionId: result.sessionId, requestId: result.requestId },
-      }),
-      createAndSendNotification({
-        userId: mohaffezId,
-        senderId: studentId,
-        title: 'حجز جلسة مجانية جديد',
-        body: `${studentName} حجز جلسة مجانية معك.`,
-        type: 'sessionconfirmed',
-        highPriority: true,
-        data: { sessionId: result.sessionId, requestId: result.requestId },
-      }),
-    ]);
-  } catch (notifError) {
-    // FIX-CONFIRM-1: Log and enqueue for retry — do NOT crash the function.
-    // The session is already confirmed; only the push notification failed.
-    functions.logger.error('confirmFreeSession: post-transaction FCM failed', {
-      sessionId: result.sessionId,
-      requestId: result.requestId,
-      studentId,
-      mohaffezId,
-      error: notifError instanceof Error ? notifError.message : String(notifError),
-    });
-    await db.collection('failedOperations').add({
-      operationType: 'notification-free-session',
-      sessionId: result.sessionId,
-      requestId: result.requestId,
-      studentId,
-      mohaffezId,
-      error: notifError instanceof Error ? notifError.message : 'unknown',
-      timestamp: FieldValue.serverTimestamp(),
-      retryCount: 0,
-      status: 'pending-retry',
-    });
-  }
-
   // BUG #1 FIX: Call EventStore and update payment document after transaction commits
   // This ensures the payment event is properly recorded for analytics
-  if (paymentId && paymentId.trim() !== '') {
+  if (normalizedPaymentId) {
     try {
       const eventStore = new EventStore();
       await eventStore.appendFreeSessionCompletedEvent({
-        paymentId: paymentId,
+        paymentId: normalizedPaymentId,
         userId: studentId,
-        promoCode: promoCode,
+        promoCode: normalizedPromoCode,
       });
-      functions.logger.info('EventStore: Free session completed event appended', { paymentId, studentId });
+      functions.logger.info('EventStore: Free session completed event appended', {
+        paymentId: normalizedPaymentId,
+        studentId,
+      });
 
       // Also ensure payment document is marked as completed (idempotent update)
-      await db.collection('payments').doc(paymentId).update({
+      await db.collection('payments').doc(normalizedPaymentId).update({
         status: 'completed',
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      functions.logger.info('Payment document marked as completed', { paymentId });
+      functions.logger.info('Payment document marked as completed', {
+        paymentId: normalizedPaymentId,
+      });
     } catch (eventStoreError) {
       // Do NOT throw - the session is already confirmed
       functions.logger.error('Failed to update payment status via EventStore (non-critical)', {
-        paymentId,
+        paymentId: normalizedPaymentId,
         error: eventStoreError instanceof Error ? eventStoreError.message : String(eventStoreError),
       });
     }
