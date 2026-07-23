@@ -35,6 +35,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final double? userLng;
   final bool previewMode;
   final bool publicMode;
+  final String? bundleSubscriptionId;
 
   const MohaffezProfileScreen({
     super.key,
@@ -43,6 +44,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
     this.userLng,
     this.previewMode = false,
     this.publicMode = false,
+    this.bundleSubscriptionId,
   });
 
   @override
@@ -63,8 +65,94 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   final GlobalKey _pricingStepKey = GlobalKey();
   final GlobalKey _scheduleStepKey = GlobalKey();
   bool _isExportingProfile = false;
+  SubscriptionModel? _bundleSubscription;
+  int? _referencedBundlePlanDuration;
+  bool _loadingBundleSubscription = false;
+  String? _bundleSubscriptionError;
 
   bool get _isPublicView => widget.publicMode;
+  bool get _isBundleBooking =>
+      widget.bundleSubscriptionId?.trim().isNotEmpty == true;
+  bool get _bundleNeedsLegacyType =>
+      _bundleSubscription != null &&
+      _bundleSubscription!.sessionType.trim().isEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isBundleBooking) {
+      _loadingBundleSubscription = true;
+      Future<void>(_loadBundleSubscription);
+    }
+  }
+
+  Future<void> _loadBundleSubscription() async {
+    final subscriptionId = widget.bundleSubscriptionId?.trim();
+    if (subscriptionId == null || subscriptionId.isEmpty) return;
+
+    try {
+      final currentUser = await ref.read(currentUserProvider.future);
+      final subscription = await ref
+          .read(sessionRepositoryProvider)
+          .getBundleById(subscriptionId);
+      int? referencedPlanDuration;
+      if (subscription != null &&
+          subscription.sessionDurationMinutes == null &&
+          subscription.planId.trim().isNotEmpty) {
+        final planSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(subscription.mohaffezId)
+            .collection('pricingPlans')
+            .doc(subscription.planId)
+            .get();
+        referencedPlanDuration =
+            (planSnapshot.data()?['sessionDurationMinutes'] as num?)?.toInt();
+      }
+      if (!mounted) return;
+
+      String? error;
+      if (currentUser == null || subscription == null) {
+        error = 'تعذر العثور على الباقة المختارة.';
+      } else if (subscription.studentId != currentUser.uid ||
+          subscription.mohaffezId != widget.mohaffezId) {
+        error = 'هذه الباقة لا تخص هذا الحساب أو المحفظ.';
+      } else if (normalizeRole(currentUser.role) == roleParent &&
+          ((subscription.studentProfileId?.trim().isEmpty ?? true) ||
+              (subscription.studentProfileName?.trim().isEmpty ?? true))) {
+        error =
+            'لا تحتوي هذه الباقة على بيانات الابن المرتبط بها. تواصل مع الدعم قبل الحجز.';
+      } else if (!subscription.canBookSession) {
+        error = 'هذه الباقة غير نشطة أو لا تحتوي على جلسات متبقية.';
+      }
+
+      setState(() {
+        _bundleSubscription = error == null ? subscription : null;
+        _referencedBundlePlanDuration = referencedPlanDuration;
+        _bundleSubscriptionError = error;
+        _loadingBundleSubscription = false;
+        if (error == null && subscription!.sessionType.trim().isNotEmpty) {
+          selectedSessionType = subscription.sessionType.trim();
+        }
+      });
+
+      if (error == null) {
+        ref
+            .read(bookingFlowProvider.notifier)
+            .setSelectedSubscription(subscriptionId);
+        ref
+            .read(bookingFlowProvider.notifier)
+            .setBookingPath(BookingPath.useExistingBundle);
+        _revealStep(_scheduleStepKey);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _bundleSubscriptionError =
+            'تعذر تحميل بيانات الباقة. يرجى المحاولة مرة أخرى.';
+        _loadingBundleSubscription = false;
+      });
+    }
+  }
 
   void _revealStep(GlobalKey key) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -277,7 +365,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       );
       return;
     }
-    if (selectedPricingPlan == null) {
+    if (_isBundleBooking && _bundleSubscription == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(_bundleSubscriptionError ?? 'تعذر تحميل الباقة المختارة.'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+      return;
+    }
+    if (!_isBundleBooking && selectedPricingPlan == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('اختر الباقة المناسبة أولًا'),
@@ -298,6 +396,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     }
     final slotContext = _buildSlotContext(profileValue);
     final bookingFlow = ref.read(bookingFlowProvider.notifier);
+    if (_isBundleBooking) {
+      final subscription = _bundleSubscription!;
+      final subscriptionId = subscription.id!;
+      bookingFlow.setSlotContext(slotContext);
+      bookingFlow.setSelectedSubscription(subscriptionId);
+      bookingFlow.setBookingPath(BookingPath.useExistingBundle);
+      context.push(
+        '/booking/confirm-bundle-session?subscriptionId=${Uri.encodeQueryComponent(subscriptionId)}',
+      );
+      return;
+    }
     final plan = selectedPricingPlan!;
     bookingFlow.selectPlan(
       planId: plan.id ?? '',
@@ -585,7 +694,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     // (e.g. teacher deactivates it mid-session). We don't auto-pick a new
     // type — the student must tap one explicitly. Empty string = "none
     // selected"; the picker tiles render that as no-selection state.
-    if (!_isPublicView) {
+    if (!_isPublicView && !_isBundleBooking) {
       ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
         next.whenData((plans) {
           if (selectedSessionType.isNotEmpty &&
@@ -684,18 +793,27 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           const SizedBox(height: 20),
                           _buildBookingsPausedNotice(),
                         ] else ...[
-                          if (!_isPublicView &&
+                          if (!_isBundleBooking &&
+                              !_isPublicView &&
                               profile['trialSessionEnabled'] == true) ...[
                             const SizedBox(height: 20),
                             _buildTrialSessionSection(profile, plansAsync),
                           ],
                           const SizedBox(height: 20),
-                          _buildModernSessionSelector(plansAsync),
-                          const SizedBox(height: 20),
-                          KeyedSubtree(
-                            key: _pricingStepKey,
-                            child: _buildModernPricingSection(plansAsync),
-                          ),
+                          if (_isBundleBooking) ...[
+                            _buildBundleBookingSummary(),
+                            if (_bundleNeedsLegacyType) ...[
+                              const SizedBox(height: 20),
+                              _buildModernSessionSelector(plansAsync),
+                            ],
+                          ] else ...[
+                            _buildModernSessionSelector(plansAsync),
+                            const SizedBox(height: 20),
+                            KeyedSubtree(
+                              key: _pricingStepKey,
+                              child: _buildModernPricingSection(plansAsync),
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           KeyedSubtree(
                             key: _scheduleStepKey,
@@ -832,6 +950,114 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         ),
                       )
                     : null,
+      ),
+    );
+  }
+
+  Widget _buildBundleBookingSummary() {
+    if (_loadingBundleSubscription) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final error = _bundleSubscriptionError;
+    if (error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppThemeConstants.error.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppThemeConstants.error.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(error, textAlign: TextAlign.center),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _loadingBundleSubscription = true;
+                    _bundleSubscriptionError = null;
+                  });
+                  _loadBundleSubscription();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final subscription = _bundleSubscription;
+    if (subscription == null) return const SizedBox.shrink();
+    final learnerName = subscription.studentProfileName?.trim();
+    final typeLabel = switch (subscription.sessionType) {
+      'online' => 'أونلاين',
+      'mosque' => 'في المسجد',
+      'home' => 'زيارة منزلية',
+      _ => 'سيتم اختيار نوع الجلسة',
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.primary.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppThemeConstants.primary.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.card_membership, color: AppThemeConstants.primary),
+                SizedBox(width: 8),
+                Text(
+                  'الحجز من باقتك النشطة',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              subscription.planTitle,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _profileChip(
+                  '${subscription.remainingSessions} جلسة متبقية',
+                  Icons.event_available,
+                ),
+                _profileChip(typeLabel, Icons.school_outlined),
+                if (subscription.sessionDurationMinutes != null)
+                  _profileChip(
+                    '${subscription.sessionDurationMinutes} دقيقة',
+                    Icons.timer_outlined,
+                  ),
+                if (learnerName != null && learnerName.isNotEmpty)
+                  _profileChip(learnerName, Icons.person_outline),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2499,13 +2725,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   final hadSelectedSlot = selectedTimeSlot != null;
                   setState(() {
                     selectedSessionType = type;
-                    selectedPricingPlan = null;
+                    if (!_isBundleBooking) selectedPricingPlan = null;
                     selectedTimeSlot = null;
                     selectedDate = null;
                     selectedDayOfWeek = null;
                   });
-                  ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
-                  _revealStep(_pricingStepKey);
+                  if (_isBundleBooking) {
+                    _revealStep(_scheduleStepKey);
+                  } else {
+                    ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+                    _revealStep(_pricingStepKey);
+                  }
                   if (hadSelectedSlot && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -2632,7 +2862,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             const <String>{};
     if (!sessionTypes.contains(selectedSessionType)) return const [];
 
-    final duration = selectedPricingPlan?.sessionDurationMinutes ??
+    final duration = _bundleSubscription?.sessionDurationMinutes ??
+        _referencedBundlePlanDuration ??
+        selectedPricingPlan?.sessionDurationMinutes ??
         (day['legacySessionDurationMinutes'] as num?)?.toInt() ??
         ScheduleConstants.defaultSessionDurationMinutes;
     final interval = (day['slotStartIntervalMinutes'] as num?)?.toInt() ??
@@ -2728,7 +2960,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     AsyncValue<List<PricingPlanModel>> plansAsync, {
     List<Map<String, dynamic>>? publicAvailability,
   }) {
-    if (selectedSessionType.isEmpty || selectedPricingPlan == null) {
+    if (selectedSessionType.isEmpty ||
+        (!_isBundleBooking && selectedPricingPlan == null) ||
+        (_isBundleBooking && _bundleSubscription == null)) {
       return const SizedBox.shrink();
     }
 

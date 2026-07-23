@@ -9,6 +9,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../providers/trial_session_provider.dart';
+import '../../shared/trial_student_preparation.dart';
 
 class TrialSessionRequestsScreen extends ConsumerWidget {
   const TrialSessionRequestsScreen({super.key});
@@ -136,6 +137,10 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
     final windows = List<Map<String, dynamic>>.from(
       request['availabilityWindows'] as List? ?? const [],
     );
+    final preparation = Map<String, dynamic>.from(
+      request['studentPreparation'] as Map? ?? const {},
+    );
+    final studentAge = _trialRequestStudentAge(request);
 
     return _TrialCard(
       title: request['studentName'] as String? ?? 'طالب',
@@ -146,6 +151,27 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (studentAge != null) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.cake_outlined,
+                  size: 18,
+                  color: AppThemeConstants.primary,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  'العمر: $studentAge سنة',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (preparation.isNotEmpty) ...[
+            _StudentPreparationSummary(preparation: preparation),
+            const SizedBox(height: 14),
+          ],
           const Text(
             'الأوقات المناسبة للطالب',
             style: TextStyle(fontWeight: FontWeight.bold),
@@ -373,6 +399,95 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
         _message(context, error.message ?? 'تعذر رفض الطلب.');
       }
     }
+  }
+}
+
+class _StudentPreparationSummary extends StatelessWidget {
+  const _StudentPreparationSummary({required this.preparation});
+
+  final Map<String, dynamic> preparation;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = preparation['note'] as String? ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppThemeConstants.primary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.school_outlined,
+                size: 19,
+                color: AppThemeConstants.primary,
+              ),
+              SizedBox(width: 7),
+              Text(
+                'معلومات تساعدك قبل الحلقة',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _PreparationLine(
+            label: 'المستوى',
+            value: trialPreparationLabel(
+              trialCurrentLevelOptions,
+              preparation['currentLevel'],
+            ),
+          ),
+          _PreparationLine(
+            label: 'الهدف',
+            value: trialPreparationLabel(
+              trialLearningGoalOptions,
+              preparation['learningGoal'],
+            ),
+          ),
+          _PreparationLine(
+            label: 'الحفظ الحالي',
+            value: trialPreparationLabel(
+              trialMemorizationLevelOptions,
+              preparation['memorizationLevel'],
+            ),
+          ),
+          if (note.isNotEmpty) _PreparationLine(label: 'ملاحظة', value: note),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreparationLine extends StatelessWidget {
+  const _PreparationLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -756,7 +871,25 @@ class _ErrorState extends StatelessWidget {
 DateTime? _timestampDate(Object? value) {
   if (value is Timestamp) return value.toDate();
   if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
   return null;
+}
+
+int? _trialRequestStudentAge(Map<String, dynamic> request) {
+  final storedAge = (request['studentAge'] as num?)?.toInt();
+  if (storedAge != null && storedAge >= 0 && storedAge <= 120) {
+    return storedAge;
+  }
+
+  final birthDate = _timestampDate(request['studentProfileBirthDate']);
+  if (birthDate == null) return null;
+  final today = DateTime.now();
+  if (birthDate.isAfter(today)) return null;
+  var age = today.year - birthDate.year;
+  final birthdayPassed = today.month > birthDate.month ||
+      (today.month == birthDate.month && today.day >= birthDate.day);
+  if (!birthdayPassed) age--;
+  return age >= 0 && age <= 120 ? age : null;
 }
 
 String _formatRange(DateTime start, DateTime end) {

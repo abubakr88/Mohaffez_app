@@ -239,7 +239,6 @@ export const createSessionRequest = functions.https.onCall(
     const canonicalStudentAge = calculateAgeFromTimestamp(
       studentProfileBirthDate,
     );
-
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
       !mohaffezId ||
@@ -371,6 +370,23 @@ export const createSessionRequest = functions.https.onCall(
 
     // ── 4. Transaction ─────────────────────────────────────────────────────
     return db.runTransaction(async (transaction) => {
+      let resolvedStudentName = studentName;
+      let resolvedGuardianId = optionalString(data.guardianId) ?? studentId;
+      let resolvedGuardianName = optionalString(data.guardianName);
+      let resolvedStudentProfileId = optionalString(data.studentProfileId);
+      let resolvedStudentProfileName = optionalString(data.studentProfileName);
+      let resolvedStudentProfileGender = optionalString(
+        data.studentProfileGender,
+      );
+      let resolvedStudentProfilePhotoUrl = optionalString(
+        data.studentProfilePhotoUrl,
+      );
+      let resolvedStudentProfileBirthDate = studentProfileBirthDate;
+      let resolvedStudentAge =
+        canonicalStudentAge ??
+        (typeof data.studentAge === "number" ? data.studentAge : null);
+      let resolvedPlanId = optionalString(data.planId);
+      let resolvedPlanTitle = optionalString(data.planTitle);
       let lockRef: FirebaseFirestore.DocumentReference | null = null;
       let availabilityRef: FirebaseFirestore.DocumentReference | null = null;
       let availabilityData: FirebaseFirestore.DocumentData | null = null;
@@ -555,6 +571,51 @@ export const createSessionRequest = functions.https.onCall(
             "الباقة المختارة غير نشطة أو انتهت صلاحيتها",
           );
         }
+        const studentAccountSnap = await transaction.get(
+          db.collection("users").doc(studentId),
+        );
+        const studentAccountRole = optionalString(
+          studentAccountSnap.data()?.role,
+        )?.toLowerCase();
+        if (
+          studentAccountRole === "parent" &&
+          (!optionalString(subscription.studentProfileId) ||
+            !optionalString(subscription.studentProfileName))
+        ) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "لا تحتوي الباقة على بيانات الابن المرتبط بها",
+          );
+        }
+        resolvedGuardianId =
+          optionalString(subscription.guardianId) ?? subscription.studentId;
+        resolvedGuardianName = optionalString(subscription.guardianName);
+        resolvedStudentProfileId = optionalString(
+          subscription.studentProfileId,
+        );
+        resolvedStudentProfileName = optionalString(
+          subscription.studentProfileName,
+        );
+        resolvedStudentProfileGender = optionalString(
+          subscription.studentProfileGender,
+        );
+        resolvedStudentProfilePhotoUrl = optionalString(
+          subscription.studentProfilePhotoUrl,
+        );
+        resolvedStudentProfileBirthDate = optionalTimestamp(
+          subscription.studentProfileBirthDate,
+        );
+        resolvedStudentAge =
+          calculateAgeFromTimestamp(resolvedStudentProfileBirthDate) ??
+          (typeof subscription.studentAge === "number"
+            ? subscription.studentAge
+            : null);
+        resolvedStudentName =
+          resolvedStudentProfileName ??
+          optionalString(subscription.studentName) ??
+          studentName;
+        resolvedPlanId = optionalString(subscription.planId);
+        resolvedPlanTitle = optionalString(subscription.planTitle);
         if (variablePlanDurationEnabled) {
           const storedSubscriptionDuration = compatibleStoredDuration(
             subscription.sessionDurationMinutes,
@@ -859,16 +920,15 @@ export const createSessionRequest = functions.https.onCall(
       transaction.set(requestRef, {
         studentId,
         mohaffezId,
-        studentName,
-        guardianId: optionalString(data.guardianId) ?? studentId,
-        guardianName: optionalString(data.guardianName),
-        studentProfileId: optionalString(data.studentProfileId),
-        studentProfileName: optionalString(data.studentProfileName),
-        studentProfileGender: optionalString(data.studentProfileGender),
-        studentProfileBirthDate,
-        studentAge:
-          canonicalStudentAge ??
-          (typeof data.studentAge === "number" ? data.studentAge : null),
+        studentName: resolvedStudentName,
+        guardianId: resolvedGuardianId,
+        guardianName: resolvedGuardianName,
+        studentProfileId: resolvedStudentProfileId,
+        studentProfileName: resolvedStudentProfileName,
+        studentProfileGender: resolvedStudentProfileGender,
+        studentProfilePhotoUrl: resolvedStudentProfilePhotoUrl,
+        studentProfileBirthDate: resolvedStudentProfileBirthDate,
+        studentAge: resolvedStudentAge,
         mohaffezName,
         sessionType,
         preferredProvider:
@@ -890,8 +950,8 @@ export const createSessionRequest = functions.https.onCall(
             ? studentPhone.trim()
             : null,
         subscriptionId: subscriptionId ?? null, // FIX-TS6133: was (data.subscriptionId as string) ?? null
-        planId: (data.planId as string) ?? null,
-        planTitle: (data.planTitle as string) ?? null,
+        planId: resolvedPlanId,
+        planTitle: resolvedPlanTitle,
         planType: rawPlanType,
         paymentAmount:
           typeof data.paymentAmount === "number" ? data.paymentAmount : null,

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../providers/trial_session_provider.dart';
+import '../../shared/trial_student_preparation.dart';
 import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/widgets/meeting_provider_picker.dart';
 
@@ -61,8 +62,12 @@ class _DayAvailability {
 class _RequestTrialSessionSheetState
     extends ConsumerState<RequestTrialSessionSheet> {
   late final List<_DayAvailability> _days;
+  final _noteController = TextEditingController();
   late String _sessionType;
   String? _selectedProvider;
+  String? _currentLevel;
+  String? _learningGoal;
+  String? _memorizationLevel;
 
   @override
   void initState() {
@@ -86,6 +91,12 @@ class _RequestTrialSessionSheetState
         ),
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
   }
 
   DateTime _combine(DateTime date, TimeOfDay time) => DateTime(
@@ -112,6 +123,12 @@ class _RequestTrialSessionSheetState
   }
 
   Future<void> _submit() async {
+    if (_currentLevel == null ||
+        _learningGoal == null ||
+        _memorizationLevel == null) {
+      _showMessage('أكمل معلوماتك المختصرة حتى يستعد المحفظ للحلقة.');
+      return;
+    }
     if (_sessionType == 'online' && _selectedProvider == null) {
       _showMessage('اختر وسيلة الاتصال للحلقة التجريبية.');
       return;
@@ -163,6 +180,12 @@ class _RequestTrialSessionSheetState
         sessionType: _sessionType,
         preferredProvider: _sessionType == 'online' ? _selectedProvider : null,
         availabilityWindows: windows,
+        studentPreparation: {
+          'currentLevel': _currentLevel,
+          'learningGoal': _learningGoal,
+          'memorizationLevel': _memorizationLevel,
+          'note': _noteController.text.trim(),
+        },
         learnerSnapshot: {
           'studentName': activeProfile.name,
           ...activeProfile.toCallableBookingSnapshot(user),
@@ -242,6 +265,8 @@ class _RequestTrialSessionSheetState
                 ),
               ),
               const SizedBox(height: 16),
+              _buildPreparationSection(),
+              const SizedBox(height: 18),
               if (widget.supportedSessionTypes.length > 1) ...[
                 const Text(
                   'نوع الحلقة',
@@ -297,6 +322,75 @@ class _RequestTrialSessionSheetState
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPreparationSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppThemeConstants.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.school_outlined, color: AppThemeConstants.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'معلومات تساعد المحفظ قبل الحلقة',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'ثلاثة أسئلة سريعة لتكون الحلقة التجريبية أنسب لك.',
+            style: TextStyle(
+              color: AppThemeConstants.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _PreparationDropdown(
+            label: 'مستواك الحالي',
+            value: _currentLevel,
+            options: trialCurrentLevelOptions,
+            onChanged: (value) => setState(() => _currentLevel = value),
+          ),
+          const SizedBox(height: 12),
+          _PreparationDropdown(
+            label: 'هدفك الأساسي',
+            value: _learningGoal,
+            options: trialLearningGoalOptions,
+            onChanged: (value) => setState(() => _learningGoal = value),
+          ),
+          const SizedBox(height: 12),
+          _PreparationDropdown(
+            label: 'مقدار الحفظ الحالي',
+            value: _memorizationLevel,
+            options: trialMemorizationLevelOptions,
+            onChanged: (value) => setState(() => _memorizationLevel = value),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteController,
+            maxLength: 250,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'ملاحظة للمحفظ (اختياري)',
+              hintText: 'مثال: أحتاج مساعدة خاصة في مخارج الحروف',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -375,6 +469,38 @@ class _RequestTrialSessionSheetState
       default:
         return Icons.videocam_outlined;
     }
+  }
+}
+
+class _PreparationDropdown extends StatelessWidget {
+  const _PreparationDropdown({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final List<TrialPreparationOption> options;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: label),
+      items: options
+          .map(
+            (option) => DropdownMenuItem(
+              value: option.id,
+              child: Text(option.label),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
   }
 }
 

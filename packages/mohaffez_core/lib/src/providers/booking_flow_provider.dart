@@ -17,6 +17,7 @@ class BookingFlowState {
   final int? selectedPlanSessions;
   final int? selectedPlanValidityDays;
   final int? selectedPlanSessionDurationMinutes;
+  final String? selectedSubscriptionId;
   final BookingPath? bookingPath;
   final String? directPaymentRequestId;
 
@@ -28,6 +29,7 @@ class BookingFlowState {
     this.selectedPlanSessions,
     this.selectedPlanValidityDays,
     this.selectedPlanSessionDurationMinutes,
+    this.selectedSubscriptionId,
     this.bookingPath,
     this.directPaymentRequestId,
   });
@@ -40,11 +42,13 @@ class BookingFlowState {
     int? selectedPlanSessions,
     int? selectedPlanValidityDays,
     int? selectedPlanSessionDurationMinutes,
+    String? selectedSubscriptionId,
     BookingPath? bookingPath,
     String? directPaymentRequestId,
     bool clearSlotContext = false,
     bool clearSelectedPlan = false,
     bool clearBookingPath = false,
+    bool clearSelectedSubscription = false,
   }) {
     return BookingFlowState(
       slotContext: clearSlotContext ? null : (slotContext ?? this.slotContext),
@@ -66,6 +70,9 @@ class BookingFlowState {
           ? null
           : (selectedPlanSessionDurationMinutes ??
               this.selectedPlanSessionDurationMinutes),
+      selectedSubscriptionId: clearSelectedSubscription
+          ? null
+          : (selectedSubscriptionId ?? this.selectedSubscriptionId),
       bookingPath: clearBookingPath ? null : (bookingPath ?? this.bookingPath),
       directPaymentRequestId:
           directPaymentRequestId ?? this.directPaymentRequestId,
@@ -82,6 +89,10 @@ class BookingFlowNotifier extends StateNotifier<BookingFlowState> {
 
   void setBookingPath(BookingPath path) {
     state = state.copyWith(bookingPath: path);
+  }
+
+  void setSelectedSubscription(String subscriptionId) {
+    state = state.copyWith(selectedSubscriptionId: subscriptionId);
   }
 
   void selectPlan({

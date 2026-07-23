@@ -286,8 +286,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final id = state.pathParameters['id']!;
               final lat = state.uri.queryParameters['lat'];
               final lng = state.uri.queryParameters['lng'];
+              final subscriptionId =
+                  state.uri.queryParameters['subscriptionId'];
               return MohaffezProfileScreen(
                 mohaffezId: id,
+                bundleSubscriptionId: subscriptionId,
                 userLat: lat != null ? double.tryParse(lat) : null,
                 userLng: lng != null ? double.tryParse(lng) : null,
               );
@@ -395,7 +398,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/booking/confirm-bundle-session',
             name: 'booking-confirm-bundle-session',
-            builder: (context, state) => const ConfirmBundleSessionScreen(),
+            builder: (context, state) => ConfirmBundleSessionScreen(
+              subscriptionId: state.uri.queryParameters['subscriptionId'],
+            ),
           ),
           GoRoute(
             path: '/booking/direct-payment',
