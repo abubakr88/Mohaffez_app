@@ -560,7 +560,9 @@ service cloud.firestore {
            .hasAny(['meeting', 'meetingReminderSent', 'meetingReminderSentAt']))
         ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']))
+         onlyUpdating(['studentFeedback', 'teacherRating', 'teacherRatedAt', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']) &&
+         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['teacherRatedAt']) ||
+          request.resource.data.teacherRatedAt == request.time))
         ||
         // Student cancels their own session. Only from 'accepted' (no
         // re-cancelling, no cancelling completed sessions); status must

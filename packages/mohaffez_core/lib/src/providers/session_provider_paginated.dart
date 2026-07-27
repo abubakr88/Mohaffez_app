@@ -1106,7 +1106,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (hifz != null) updates['hifzAssignment'] = hifz;
     if (muraja != null) updates['murajaAssignment'] = muraja;
     if (notes != null) updates['reviewNotes'] = notes;
-    if (rating != null) updates['teacherRating'] = rating;
+    if (rating != null) {
+      updates['teacherRating'] = rating;
+      updates['teacherRatedAt'] = FieldValue.serverTimestamp();
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+    }
     if (startedLate != null) updates['startedLate'] = startedLate;
     if (updates.isNotEmpty) {
       await updateSession(sessionId, updates);

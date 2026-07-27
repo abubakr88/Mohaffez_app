@@ -384,6 +384,7 @@ class TeacherStats {
   final double revenue; // sum of sessionPrice over completed sessions
   final double? avgRating; // mean teacherRating over rated sessions
   final int ratingCount;
+  final List<Map<String, dynamic>> ratings; // newest rating first
   final List<Map<String, dynamic>> recentSessions; // newest first
 
   const TeacherStats({
@@ -395,6 +396,7 @@ class TeacherStats {
     required this.revenue,
     required this.avgRating,
     required this.ratingCount,
+    required this.ratings,
     required this.recentSessions,
   });
 }
@@ -434,6 +436,21 @@ final teacherStatsProvider = FutureProvider.autoDispose
 
   final recent = [...sessions]..sort((a, b) => _compareTs(
       b['sessionDate'] ?? b['slotStart'], a['sessionDate'] ?? a['slotStart']));
+  final ratings = sessions
+      .where((s) => ((s['teacherRating'] as num?)?.toDouble() ?? 0) > 0)
+      .toList()
+    ..sort((a, b) => _compareTs(
+          b['teacherRatedAt'] ??
+              b['updatedAt'] ??
+              b['completedAt'] ??
+              b['sessionDate'] ??
+              b['slotStart'],
+          a['teacherRatedAt'] ??
+              a['updatedAt'] ??
+              a['completedAt'] ??
+              a['sessionDate'] ??
+              a['slotStart'],
+        ));
 
   return TeacherStats(
     total: sessions.length,
@@ -444,6 +461,7 @@ final teacherStatsProvider = FutureProvider.autoDispose
     revenue: revenue,
     avgRating: ratingCount > 0 ? ratingSum / ratingCount : null,
     ratingCount: ratingCount,
+    ratings: ratings,
     recentSessions: recent.take(10).toList(),
   );
 });

@@ -1568,6 +1568,211 @@ class _StatsSection extends ConsumerWidget {
                 : '${stats.avgRating!.toStringAsFixed(1)} (${stats.ratingCount})',
             icon: Icons.star_outline_rounded,
             iconColor: DSColors.secondary,
+            onTap: stats.ratings.isEmpty
+                ? null
+                : () => _showTeacherRatings(context, stats),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showTeacherRatings(
+  BuildContext context,
+  TeacherStats stats,
+) {
+  final maxListHeight =
+      (MediaQuery.sizeOf(context).height * 0.52).clamp(148.0, 520.0).toDouble();
+  final listHeight =
+      (stats.ratings.length * 148.0).clamp(148.0, maxListHeight).toDouble();
+
+  return DSDialog.show<void>(
+    context,
+    title: 'تقييمات المحفظ',
+    width: 760,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: DSSpacing.sm,
+          runSpacing: DSSpacing.sm,
+          children: [
+            _RatingSummaryChip(
+              icon: Icons.star_rounded,
+              label: stats.avgRating == null
+                  ? 'لا يوجد متوسط'
+                  : 'المتوسط ${stats.avgRating!.toStringAsFixed(1)} من 10',
+            ),
+            _RatingSummaryChip(
+              icon: Icons.rate_review_outlined,
+              label: '${stats.ratingCount} تقييم',
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        SizedBox(
+          height: listHeight,
+          child: ListView.separated(
+            itemCount: stats.ratings.length,
+            separatorBuilder: (_, __) => const SizedBox(height: DSSpacing.sm),
+            itemBuilder: (context, index) =>
+                _TeacherRatingItem(rating: stats.ratings[index]),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RatingSummaryChip extends StatelessWidget {
+  const _RatingSummaryChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DSSpacing.md,
+        vertical: DSSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: DSColors.secondary.withValues(alpha: 0.08),
+        borderRadius: DSRadius.mdAll,
+        border: Border.all(
+          color: DSColors.secondary.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: DSColors.secondary),
+          const SizedBox(width: DSSpacing.xs),
+          Text(label, style: DSText.bodyMedium(context)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TeacherRatingItem extends StatelessWidget {
+  const _TeacherRatingItem({required this.rating});
+
+  final Map<String, dynamic> rating;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = (rating['teacherRating'] as num?)?.toDouble() ?? 0;
+    final learnerName = _nullableText(
+          rating,
+          const ['studentProfileName', 'learnerName', 'studentName'],
+        ) ??
+        'طالب';
+    final guardianName = _nullableText(
+      rating,
+      const ['guardianName', 'studentName'],
+    );
+    final comment =
+        _nullableText(rating, const ['studentFeedback', 'reviewNotes']);
+    final ratedAt = _toDate(
+      rating['teacherRatedAt'] ??
+          rating['sessionDate'] ??
+          rating['slotStart'] ??
+          rating['completedAt'] ??
+          rating['updatedAt'],
+    );
+    final isInferredDate = rating['teacherRatedAt'] == null;
+    final initial = learnerName.trim().isEmpty ? 'ط' : learnerName.trim()[0];
+
+    return Container(
+      padding: const EdgeInsets.all(DSSpacing.lg),
+      decoration: BoxDecoration(
+        color: DSColors.surfaceMuted,
+        borderRadius: DSRadius.mdAll,
+        border: Border.all(color: DSColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: DSColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  initial,
+                  style: DSText.bodyMedium(context, color: DSColors.primary),
+                ),
+              ),
+              const SizedBox(width: DSSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(learnerName, style: DSText.bodyMedium(context)),
+                    if (guardianName != null && guardianName != learnerName)
+                      Text(
+                        'ولي الأمر: $guardianName',
+                        style: DSText.caption(
+                          context,
+                          color: DSColors.text3,
+                        ),
+                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ratedAt == null
+                          ? 'وقت التقييم غير متاح'
+                          : '${isInferredDate ? 'تاريخ الجلسة' : 'وقت التقييم'}: '
+                              '${DateFormat('dd/MM/yyyy - hh:mm a', 'ar').format(ratedAt)}',
+                      style: DSText.caption(context, color: DSColors.text3),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DSSpacing.sm,
+                  vertical: DSSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: DSColors.secondary.withValues(alpha: 0.12),
+                  borderRadius: DSRadius.mdAll,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 17,
+                      color: DSColors.secondary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${score.toStringAsFixed(score % 1 == 0 ? 0 : 1)}/10',
+                      style: DSText.bodyMedium(
+                        context,
+                        color: DSColors.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.md),
+          Text(
+            comment ?? 'لم يضف الطالب تعليقًا.',
+            style: DSText.body(
+              context,
+              color: comment == null ? DSColors.text3 : DSColors.text1,
+            ),
           ),
         ],
       ),
