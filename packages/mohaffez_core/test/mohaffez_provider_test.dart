@@ -25,6 +25,23 @@ void main() {
   });
 
   group('teacher reputation score', () {
+    test('hides legacy aggregate fields from public teacher profiles', () {
+      final legacy = withPublicTeacherRatingV2({
+        'rating': 8.5,
+        'reviewCount': 7,
+      });
+      final current = withPublicTeacherRatingV2({
+        'rating': 4.5,
+        'reviewCount': 3,
+        'ratingPolicyVersion': 2,
+      });
+
+      expect(legacy['rating'], 0);
+      expect(legacy['reviewCount'], 0);
+      expect(current['rating'], 4.5);
+      expect(current['reviewCount'], 3);
+    });
+
     test('does not let one perfect rating outrank sustained high quality', () {
       final newTeacher = MohaffezModel(
         id: 'new',
@@ -49,6 +66,7 @@ void main() {
       final teacher = MohaffezModel(id: 'new', name: 'New', rating: 0);
 
       expect(teacher.reputationScore, 0);
+      expect(teacher.ratingLabel, 'جديد');
     });
   });
 }

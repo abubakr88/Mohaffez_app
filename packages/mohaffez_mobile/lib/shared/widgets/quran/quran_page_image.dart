@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'quran_mistake_painter.dart';
 
-class QuranPageImage extends StatelessWidget {
+class QuranPageImage extends StatefulWidget {
   final GlobalKey imageKey;
   final int currentPage;
   final Map<String, dynamic>? pageInfo;
@@ -22,16 +22,31 @@ class QuranPageImage extends StatelessWidget {
   });
 
   @override
+  State<QuranPageImage> createState() => _QuranPageImageState();
+}
+
+class _QuranPageImageState extends State<QuranPageImage> {
+  int _retryToken = 0;
+
+  @override
+  void didUpdateWidget(covariant QuranPageImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentPage != widget.currentPage) {
+      _retryToken = 0;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MouseRegion(
       hitTestBehavior: HitTestBehavior.translucent,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTapDown: onTapDown,
+        onTapDown: widget.onTapDown,
         child: Stack(
           children: [
             Container(
-              key: imageKey,
+              key: widget.imageKey,
               color: const Color(0xFFF5F3E8),
               child: Center(child: _buildPageImage()),
             ),
@@ -39,7 +54,7 @@ class QuranPageImage extends StatelessWidget {
               child: AbsorbPointer(
                 absorbing: true,
                 child: CustomPaint(
-                  painter: QuranMistakePainter(mistakes: mistakes),
+                  painter: QuranMistakePainter(mistakes: widget.mistakes),
                 ),
               ),
             ),
@@ -50,26 +65,28 @@ class QuranPageImage extends StatelessWidget {
   }
 
   Widget _buildPageImage() {
-    final imageUrl = QuranService().getPageImageUrl(currentPage);
+    final imageUrl = QuranService().getPageImageUrl(widget.currentPage);
 
     if (kIsWeb) {
       return Image.network(
         imageUrl,
+        key: ValueKey('quran-web-${widget.currentPage}-$_retryToken'),
         fit: BoxFit.contain,
         webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return _loadingWidget();
         },
-        errorBuilder: (context, error, stackTrace) => _errorWidget(),
+        errorBuilder: (context, error, stackTrace) => _errorWidget(imageUrl),
       );
     }
 
     return CachedNetworkImage(
+      key: ValueKey('quran-native-${widget.currentPage}-$_retryToken'),
       imageUrl: imageUrl,
       fit: BoxFit.contain,
       placeholder: (context, url) => _loadingWidget(),
-      errorWidget: (context, url, error) => _errorWidget(),
+      errorWidget: (context, url, error) => _errorWidget(imageUrl),
     );
   }
 
@@ -79,12 +96,22 @@ class QuranPageImage extends StatelessWidget {
       children: [
         const CircularProgressIndicator(),
         const SizedBox(height: 16),
-        Text('تحميل صفحة $currentPage...'),
+        Text('تحميل صفحة ${widget.currentPage}...'),
       ],
     );
   }
 
-  Widget _errorWidget() {
+  Future<void> _retry(String imageUrl) async {
+    if (kIsWeb) {
+      await NetworkImage(imageUrl).evict();
+    } else {
+      await CachedNetworkImage.evictFromCache(imageUrl);
+    }
+    if (!mounted) return;
+    setState(() => _retryToken++);
+  }
+
+  Widget _errorWidget(String imageUrl) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -95,7 +122,7 @@ class QuranPageImage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'صفحة $currentPage',
+          'صفحة ${widget.currentPage}',
           style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -103,7 +130,7 @@ class QuranPageImage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'الجزء ${pageInfo?['juz'] ?? ''}',
+          'الجزء ${widget.pageInfo?['juz'] ?? ''}',
           style: const TextStyle(
             fontSize: 16,
             color: AppThemeConstants.grey600,
@@ -113,6 +140,12 @@ class QuranPageImage extends StatelessWidget {
         const Text(
           'تأكد من الاتصال بالإنترنت',
           style: TextStyle(color: AppThemeConstants.error),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => _retry(imageUrl),
+          icon: const Icon(Icons.refresh),
+          label: const Text('إعادة المحاولة'),
         ),
       ],
     );

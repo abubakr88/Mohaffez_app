@@ -59,6 +59,7 @@ lib/firebase_options.dart
 *.freezed.dart
 *.g.dart
 functions/serviceAccountKey.json
+functions/migration_backups/
 # Cloud Functions compiled output — rebuilt by the firebase.json predeploy hook
 functions/lib/
 

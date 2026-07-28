@@ -2161,7 +2161,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
             children: [
               _MetricPill(
                 icon: Icons.star_rounded,
-                label: teacher.rating.toStringAsFixed(1),
+                label: teacher.ratingLabel,
                 color: AppThemeConstants.secondary,
               ),
               _MetricPill(
@@ -2324,7 +2324,7 @@ class _TeacherPreviewCard extends StatelessWidget {
                       children: [
                         _MetricPill(
                           icon: Icons.star_rounded,
-                          label: teacher.rating.toStringAsFixed(1),
+                          label: teacher.ratingLabel,
                           color: AppThemeConstants.secondary,
                         ),
                         _MetricPill(
@@ -2488,7 +2488,7 @@ class _TeacherResultTile extends StatelessWidget {
                       children: [
                         _MetricPill(
                           icon: Icons.star_rounded,
-                          label: teacher.rating.toStringAsFixed(1),
+                          label: teacher.ratingLabel,
                           color: AppThemeConstants.secondary,
                         ),
                         if (distance != null)

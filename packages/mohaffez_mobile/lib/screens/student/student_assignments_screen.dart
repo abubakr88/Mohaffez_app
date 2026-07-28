@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:go_router/go_router.dart';
+import '../../providers/quran_local_providers.dart';
+import '../../services/quran_local_store.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 
@@ -115,6 +117,8 @@ class _AssignmentsContent extends ConsumerStatefulWidget {
 }
 
 class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
+  String? _lastLocalCacheSignature;
+
   Future<void> _refreshAssignments() async {
     ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
     await ref
@@ -122,10 +126,42 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
         .catchError((_) => <Map<String, dynamic>>[]);
   }
 
+  Future<void> _cacheCompletedSessions(
+    List<Map<String, dynamic>> sessions,
+  ) async {
+    final completedSessions = _filterSessionsForProfile(
+      sessions,
+      widget.studentProfileId,
+      requireProfileScope: widget.requireProfileScope,
+    ).where((session) => session['status'] == 'completed').take(10).toList();
+    final signature = completedSessions
+        .map((session) =>
+            '${session['id']}:${session['updatedAt']}:${session['mistakesCount']}')
+        .join('|');
+    if (signature == _lastLocalCacheSignature) return;
+    _lastLocalCacheSignature = signature;
+
+    final scope = QuranLocalScope(
+      userId: widget.studentId,
+      studentProfileId: widget.studentProfileId,
+    );
+    final store = await QuranLocalStore.create();
+    await store.cacheLoadedSessions(scope, completedSessions);
+    if (!mounted) return;
+    ref.invalidate(quranCachedSessionsProvider((
+      userId: widget.studentId,
+      studentProfileId: widget.studentProfileId,
+    )));
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionsAsync =
         ref.watch(studentSessionsFirstPageProvider(widget.studentId));
+    ref.listen(
+      studentSessionsFirstPageProvider(widget.studentId),
+      (_, next) => next.whenData(_cacheCompletedSessions),
+    );
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -206,6 +242,9 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                     )
                         .where((s) => (s['status'] as String?) == 'completed')
                         .toList();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _cacheCompletedSessions(sessions);
+                    });
 
                     if (completedSessions.isEmpty) {
                       return const SliverFillRemaining(
@@ -621,7 +660,11 @@ class _CompletedAssignmentCardState
             ],
 
             // Mistakes review card
-            _MistakeReviewCard(session: session),
+            _MistakeReviewCard(
+              session: session,
+              studentId: widget.studentId,
+              studentProfileId: widget.studentProfileId,
+            ),
 
             // Rating section
             const SizedBox(height: 16),
@@ -905,9 +948,15 @@ class _CompletedAssignmentItemState extends State<_CompletedAssignmentItem> {
 
 class _MistakeReviewCard extends StatelessWidget {
   final Map<String, dynamic> session;
+  final String studentId;
+  final String? studentProfileId;
   late final List<QuranMistake> _mistakes;
 
-  _MistakeReviewCard({required this.session}) {
+  _MistakeReviewCard({
+    required this.session,
+    required this.studentId,
+    this.studentProfileId,
+  }) {
     final mistakesData = session['mistakes'] as List<dynamic>?;
     if (mistakesData == null || mistakesData.isEmpty) {
       _mistakes = [];
@@ -919,14 +968,30 @@ class _MistakeReviewCard extends StatelessWidget {
     }
   }
 
-  void _openMushaf(BuildContext context) {
+  Future<void> _openMushaf(BuildContext context) async {
     if (_mistakes.isEmpty) return;
+
+    final store = await QuranLocalStore.create();
+    await store.cacheSession(
+      QuranLocalScope(
+        userId: studentId,
+        studentProfileId: studentProfileId,
+      ),
+      session,
+    );
+    if (!context.mounted) return;
 
     final startPage = _mistakes.first.pageNumber;
 
-    context.push(
+    await context.push(
       '/mushaf/$startPage',
-      extra: <String, dynamic>{'mistakes': _mistakes},
+      extra: <String, dynamic>{
+        'mistakes': _mistakes,
+        'sessionId': session['id'],
+        'mohaffezName': session['mohaffezName'],
+        'sessionDate': session['sessionDate'],
+        'studentProfileId': studentProfileId,
+      },
     );
   }
 

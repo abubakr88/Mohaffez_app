@@ -28,6 +28,7 @@ function publicUserProfile(
   id: string,
   data: FirebaseFirestore.DocumentData,
 ): Record<string, unknown> {
+  const usesCurrentRatingPolicy = data.ratingPolicyVersion === 2;
   return {
     uid: id,
     name: safeString(data.name) ?? "محفظ",
@@ -39,8 +40,11 @@ function publicUserProfile(
     youtubeVideoUrl: safeString(data.youtubeVideoUrl),
     introVideoUrl: safeString(data.introVideoUrl),
     videoUrl: safeString(data.videoUrl),
-    rating: safeNumber(data.rating),
-    reviewCount: Math.max(0, Math.trunc(safeNumber(data.reviewCount))),
+    rating: usesCurrentRatingPolicy ? safeNumber(data.rating) : 0,
+    reviewCount: usesCurrentRatingPolicy
+      ? Math.max(0, Math.trunc(safeNumber(data.reviewCount)))
+      : 0,
+    ratingPolicyVersion: usesCurrentRatingPolicy ? 2 : 0,
     completedSessionsCount: Math.max(
       0,
       Math.trunc(safeNumber(data.completedSessionsCount)),

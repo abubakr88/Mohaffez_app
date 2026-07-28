@@ -199,6 +199,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'followingCount': 0,
           'rating': 0.0,
           'reviewCount': 0,
+          if (role == roleMohaffez) ...{
+            'ratingSum': 0.0,
+            'ratingScale': 5,
+            'ratingPolicyVersion': 2,
+          },
           'addressText': null,
           'addressLat': null,
           'addressLng': null,
@@ -327,6 +332,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'followingCount': 0,
           'rating': 0.0,
           'reviewCount': 0,
+          if (role == roleMohaffez) ...{
+            'ratingSum': 0.0,
+            'ratingScale': 5,
+            'ratingPolicyVersion': 2,
+          },
           'addressText': null,
           'addressLat': null,
           'addressLng': null,

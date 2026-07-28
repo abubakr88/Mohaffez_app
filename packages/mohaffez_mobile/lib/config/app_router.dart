@@ -74,6 +74,7 @@ import '../screens/teacher/teacher_setup_wizard_screen.dart';
 // lives only on the web console. Admins who sign in see a "use web" notice.
 import '../screens/shared/admin_web_only_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
+import '../screens/student/student_interactive_quran_screen.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 
@@ -371,22 +372,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/interactive-quran',
             name: 'interactive-quran',
-            builder: (context, state) {
-              return Directionality(
-                textDirection: TextDirection.rtl,
-                child: Scaffold(
-                  appBar: AppBar(
-                    title: const Text('المصحف التفاعلي'),
-                    backgroundColor: AppThemeConstants.primary,
-                  ),
-                  body: InteractiveQuranPage(
-                    pageNumber: 1,
-                    onMistakeAdded: (_) {},
-                    isEditable: false,
-                  ),
-                ),
-              );
-            },
+            builder: (context, state) => const StudentInteractiveQuranScreen(),
           ),
           GoRoute(
             path: '/requests',

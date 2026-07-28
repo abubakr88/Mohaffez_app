@@ -378,7 +378,7 @@ double? _teacherRatingOnFivePointScale(Map<String, dynamic> session) {
   final raw = (session['teacherRating'] as num?)?.toDouble();
   if (raw == null || raw <= 0) return null;
   final scale = (session['teacherRatingScale'] as num?)?.toInt();
-  if (scale == 10 || (scale == null && raw > 5)) return raw / 2;
+  if (scale != 5) return null;
   return raw <= 5 ? raw : null;
 }
 

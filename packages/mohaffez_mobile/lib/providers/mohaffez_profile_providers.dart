@@ -22,10 +22,10 @@ final mohaffezProfileProvider =
         throw Exception('المحفظ غير موجود');
       }
 
-      return {
+      return withPublicTeacherRatingV2({
         ...doc.data()!,
         'uid': doc.id,
-      };
+      });
     });
   },
 );

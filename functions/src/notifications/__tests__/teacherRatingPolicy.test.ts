@@ -50,4 +50,18 @@ describe('teacher rating policy', () => {
       })
     ).toBe(true);
   });
+
+  it('keeps legacy ratings historical even when they can be normalized', () => {
+    expect(
+      countsTowardTeacherRating({
+        teacherRating: 10,
+      })
+    ).toBe(false);
+    expect(
+      countsTowardTeacherRating({
+        teacherRating: 8,
+        teacherRatingScale: 10,
+      })
+    ).toBe(false);
+  });
 });

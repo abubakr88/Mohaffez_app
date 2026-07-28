@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../providers/quiz_access_provider.dart';
+import '../../providers/quran_local_providers.dart';
 import '../../providers/trial_session_provider.dart';
 import '../../services/app_version_service.dart';
 import '../../shared/widgets/error_widgets.dart';
@@ -429,7 +430,10 @@ class StudentHomeContent extends ConsumerWidget {
                         learnerName: nextSessionLearnerName,
                       ),
                       if (nextSessionDate != null) const SizedBox(height: 20),
-                      const _QuranAccessCard(),
+                      _QuranAccessCard(
+                        studentId: studentId,
+                        studentProfileId: activeLearnerProfileId,
+                      ),
                       const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
@@ -1001,11 +1005,37 @@ class _StatCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTERACTIVE QURAN ACCESS
 // ═══════════════════════════════════════════════════════════════════════════════
-class _QuranAccessCard extends StatelessWidget {
-  const _QuranAccessCard();
+class _QuranAccessCard extends ConsumerWidget {
+  const _QuranAccessCard({
+    required this.studentId,
+    this.studentProfileId,
+  });
+
+  final String studentId;
+  final String? studentProfileId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scope = (
+      userId: studentId,
+      studentProfileId: studentProfileId,
+    );
+    final progress = ref.watch(quranLocalProgressProvider(scope)).valueOrNull;
+    final sessions = ref.watch(quranCachedSessionsProvider(scope)).valueOrNull;
+    final latest = sessions == null || sessions.isEmpty ? null : sessions.first;
+    String description;
+    if (latest?.hasHifz == true && latest?.hasMuraja == true) {
+      description = 'لديك ورد حفظ ومراجعة من آخر جلسة';
+    } else if (latest?.hasHifz == true) {
+      description = 'لديك ورد حفظ جديد من آخر جلسة';
+    } else if (latest?.hasMuraja == true) {
+      description = 'لديك ورد مراجعة من آخر جلسة';
+    } else if ((progress?.lastPage ?? 1) > 1) {
+      description = 'متابعة القراءة من صفحة ${progress!.lastPage}';
+    } else {
+      description = 'تصفح الصفحات والسور والأجزاء';
+    }
+
     return Semantics(
       button: true,
       label: 'فتح المصحف التفاعلي',
@@ -1086,7 +1116,7 @@ class _QuranAccessCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'تصفح الصفحات والسور والأجزاء',
+                              description,
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,

@@ -165,6 +165,11 @@ class UserRepository {
         'followerCount': user.followerCount,
         'followingCount': user.followingCount,
         'reviewCount': user.reviewCount,
+        if (normalizeRole(user.role) == roleMohaffez) ...{
+          'ratingSum': 0.0,
+          'ratingScale': 5,
+          'ratingPolicyVersion': 2,
+        },
         'createdAt': FieldValue.serverTimestamp(),
       };
 

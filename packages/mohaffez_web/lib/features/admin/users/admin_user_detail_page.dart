@@ -1672,7 +1672,8 @@ class _TeacherRatingItem extends StatelessWidget {
     final score = (rating['teacherRating'] as num?)?.toDouble() ?? 0;
     final scoreScale =
         (rating['teacherRatingScale'] as num?)?.toInt() ?? (score > 5 ? 10 : 5);
-    final isExcluded = rating['teacherRatingReason'] == 'technical_only';
+    final isLegacy = (rating['teacherRatingScale'] as num?)?.toInt() != 5;
+    final isTechnicalOnly = rating['teacherRatingReason'] == 'technical_only';
     final technicalIssueSource =
         _technicalIssueSourceLabel(rating['technicalIssueSource']);
     final learnerName = _nullableText(
@@ -1773,7 +1774,13 @@ class _TeacherRatingItem extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DSSpacing.md),
-          if (isExcluded) ...[
+          if (isLegacy) ...[
+            Text(
+              'تقييم تاريخي غير محتسب في المتوسط العام',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+            const SizedBox(height: DSSpacing.xs),
+          ] else if (isTechnicalOnly) ...[
             Text(
               'مستبعد من المتوسط العام: بلاغ تقني فقط',
               style: DSText.caption(context, color: DSColors.primary),

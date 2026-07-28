@@ -3,6 +3,24 @@ import 'dart:math'; // ✅ إضافة هذا السطر
 import 'teacher_badge.dart';
 import 'user_model.dart';
 
+Map<String, dynamic> withPublicTeacherRatingV2(
+  Map<String, dynamic> data,
+) {
+  final ratingPolicyVersion =
+      (data['ratingPolicyVersion'] as num?)?.toInt() ?? 0;
+  final usesCurrentRatingPolicy = ratingPolicyVersion == 2;
+  return {
+    ...data,
+    'rating': usesCurrentRatingPolicy
+        ? (data['rating'] as num?)?.toDouble() ?? 0.0
+        : 0.0,
+    'reviewCount': usesCurrentRatingPolicy
+        ? (data['reviewCount'] as num?)?.toInt() ?? 0
+        : 0,
+    'ratingPolicyVersion': ratingPolicyVersion,
+  };
+}
+
 class MohaffezModel {
   final String id;
   final String name;
@@ -14,6 +32,7 @@ class MohaffezModel {
   final String? addressText;
   final double rating;
   final int reviewCount;
+  final int ratingPolicyVersion;
   final int followerCount;
   final String? bio;
   final String? phoneNumber;
@@ -34,6 +53,7 @@ class MohaffezModel {
     this.addressText,
     this.rating = 0.0,
     this.reviewCount = 0,
+    this.ratingPolicyVersion = 0,
     this.followerCount = 0,
     this.bio,
     this.phoneNumber,
@@ -45,10 +65,11 @@ class MohaffezModel {
   });
 
   factory MohaffezModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) {
+    final rawData = doc.data() as Map<String, dynamic>?;
+    if (rawData == null) {
       throw Exception('Document data is null');
     }
+    final data = withPublicTeacherRatingV2(rawData);
 
     return MohaffezModel(
       id: doc.id,
@@ -61,6 +82,7 @@ class MohaffezModel {
       addressText: data['addressText'] as String?,
       rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (data['reviewCount'] as num?)?.toInt() ?? 0,
+      ratingPolicyVersion: (data['ratingPolicyVersion'] as num?)?.toInt() ?? 0,
       followerCount: data['followerCount'] as int? ?? 0,
       bio: data['bio'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
@@ -73,6 +95,8 @@ class MohaffezModel {
   }
 
   String get displayName => composeTeacherDisplayName(name, honorific);
+  String get ratingLabel =>
+      reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد';
 
   /// Confidence-adjusted score used for ordering teachers. Five prior reviews
   /// at the neutral-positive platform baseline prevent one early review from

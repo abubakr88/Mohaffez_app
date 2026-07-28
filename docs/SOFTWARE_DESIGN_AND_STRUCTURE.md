@@ -265,9 +265,10 @@ Screen ──watch──▶ Provider (AsyncValue state) ──▶ Repository ─
 - **Session rating pipeline:** student writes `teacherRating` (int),
   `teacherRatingScale` (5), `technicalIssueSource`, optional
   `teacherRatingReason`, and `reviewNotes` to `hafizSessions`; Cloud Function
-  `onTeacherRated` normalizes legacy values and updates the teacher's public
-  five-point average on `users/{mohaffezId}`. Feedback with
-  `teacherRatingReason == 'technical_only'` is excluded from that average. Field names
+  `onTeacherRated` counts only explicit V2 five-point values and updates the
+  teacher's public average on `users/{mohaffezId}`. Legacy values and feedback
+  with `teacherRatingReason == 'technical_only'` remain admin-visible but are
+  excluded from that average. Public aggregates use `ratingPolicyVersion == 2`.
   must match Firestore security rules.
 - **Date fields** may be `Timestamp`, `DateTime`, or `String` — always normalize
   via a `_toDateTime(dynamic)` helper.

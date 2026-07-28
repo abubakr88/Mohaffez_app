@@ -1,10 +1,35 @@
-﻿// lib/shared/widgets/interactive_quran_page.dart
+// lib/shared/widgets/interactive_quran_page.dart
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'quran/mistake_detail_dialog.dart';
 import 'quran/mistake_type_selector.dart';
+import 'quran/quran_mistake_painter.dart';
 import 'quran/quran_page_image.dart';
+
+class InteractiveQuranController {
+  VoidCallback? _openJumpSheet;
+  void Function(int page)? _changePage;
+
+  void openJumpSheet() => _openJumpSheet?.call();
+
+  void jumpToPage(int page) => _changePage?.call(page);
+
+  void _attach({
+    required VoidCallback openJumpSheet,
+    required void Function(int page) changePage,
+  }) {
+    _openJumpSheet = openJumpSheet;
+    _changePage = changePage;
+  }
+
+  void _detach() {
+    _openJumpSheet = null;
+    _changePage = null;
+  }
+}
 
 class InteractiveQuranPage extends StatefulWidget {
   final int pageNumber;
@@ -12,6 +37,8 @@ class InteractiveQuranPage extends StatefulWidget {
   final Function(QuranMistake) onMistakeAdded;
   final bool isEditable;
   final Function(int)? onPageChanged;
+  final InteractiveQuranController? controller;
+  final bool showControls;
 
   const InteractiveQuranPage({
     super.key,
@@ -20,6 +47,8 @@ class InteractiveQuranPage extends StatefulWidget {
     required this.onMistakeAdded,
     this.isEditable = true,
     this.onPageChanged,
+    this.controller,
+    this.showControls = true,
   });
 
   @override
@@ -40,11 +69,29 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   void initState() {
     super.initState();
     currentPage = widget.pageNumber;
+    _attachController();
     _loadPageData();
   }
 
   @override
+  void didUpdateWidget(covariant InteractiveQuranPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach();
+      _attachController();
+    }
+  }
+
+  void _attachController() {
+    widget.controller?._attach(
+      openJumpSheet: _openJumpSheet,
+      changePage: _changePage,
+    );
+  }
+
+  @override
   void dispose() {
+    widget.controller?._detach();
     _transformController.dispose();
     super.dispose();
   }
@@ -58,10 +105,25 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         pageInfo = info;
         isLoading = false;
       });
+      _precacheAdjacentPage();
     } catch (e) {
       debugPrint('Error loading page data: $e');
       if (!mounted) return;
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _precacheAdjacentPage() async {
+    if (!mounted || currentPage >= QuranService.totalPages) return;
+    final url = QuranService().getPageImageUrl(currentPage + 1);
+    try {
+      if (kIsWeb) {
+        await precacheImage(NetworkImage(url), context);
+      } else {
+        await precacheImage(CachedNetworkImageProvider(url), context);
+      }
+    } catch (_) {
+      // The visible page has its own retry state. Prefetch failure is harmless.
     }
   }
 
@@ -109,16 +171,17 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
           child: Stack(
             children: [
               _buildQuranPageImage(),
-              Positioned(
-                bottom: 12,
-                left: 12,
-                child: _buildZoomControls(),
-              ),
+              if (widget.showControls)
+                Positioned(
+                  bottom: 12,
+                  left: 12,
+                  child: _buildZoomControls(),
+                ),
             ],
           ),
         ),
         if (_hasAnyComments()) _buildCommentLegend(),
-        _buildPageNavigation(),
+        if (widget.showControls) _buildPageNavigation(),
       ],
     );
   }
@@ -128,20 +191,45 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildQuranPageImage() {
-    return InteractiveViewer(
-      transformationController: _transformController,
-      minScale: 1.0,
-      maxScale: 4.0,
-      child: QuranPageImage(
-        imageKey: _imageKey,
-        currentPage: currentPage,
-        pageInfo: pageInfo,
-        mistakes: widget.existingMistakes
-            .where((m) => m.pageNumber == currentPage)
-            .toList(),
-        onTapDown: _handleTapDown,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onDoubleTap: _toggleDoubleTapZoom,
+      onHorizontalDragEnd: _handleHorizontalSwipe,
+      child: InteractiveViewer(
+        transformationController: _transformController,
+        minScale: 1.0,
+        maxScale: 4.0,
+        child: QuranPageImage(
+          imageKey: _imageKey,
+          currentPage: currentPage,
+          pageInfo: pageInfo,
+          mistakes: widget.existingMistakes
+              .where((m) => m.pageNumber == currentPage)
+              .toList(),
+          onTapDown: _handleTapDown,
+        ),
       ),
     );
+  }
+
+  void _toggleDoubleTapZoom() {
+    final scale = _transformController.value.getMaxScaleOnAxis();
+    if (scale > 1.01) {
+      _resetZoom();
+      return;
+    }
+    _transformController.value = Matrix4.identity()
+      ..scaleByDouble(2.0, 2.0, 1.0, 1.0);
+  }
+
+  void _handleHorizontalSwipe(DragEndDetails details) {
+    if (_transformController.value.getMaxScaleOnAxis() > 1.01) return;
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity > 350) {
+      _changePage(currentPage + 1);
+    } else if (velocity < -350) {
+      _changePage(currentPage - 1);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -211,9 +299,13 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     final xPosition = (localPosition.dx / size.width).clamp(0.0, 1.0);
     final yPosition = (localPosition.dy / size.height).clamp(0.0, 1.0);
 
-    final tappedMistake = _findTappedMistake(xPosition, yPosition);
-    if (tappedMistake != null) {
-      _showMistakeDetails(tappedMistake);
+    final tappedCluster = _findTappedCluster(xPosition, yPosition);
+    if (tappedCluster != null) {
+      if (tappedCluster.mistakes.length == 1) {
+        _showMistakeDetails(tappedCluster.mistakes.first);
+      } else {
+        _showMistakeCluster(tappedCluster.mistakes);
+      }
       return;
     }
 
@@ -221,17 +313,76 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     _showMistakeDialog(xPosition, yPosition);
   }
 
-  QuranMistake? _findTappedMistake(double x, double y) {
-    const threshold = 0.03;
-    for (final mistake
-        in widget.existingMistakes.where((m) => m.pageNumber == currentPage)) {
-      final dx = (mistake.xPosition - x).abs();
-      final dy = (mistake.yPosition - y).abs();
-      if (dx <= threshold && dy <= threshold) {
-        return mistake;
+  QuranMistakeCluster? _findTappedCluster(double x, double y) {
+    const hitThreshold = 0.06;
+    final mistakes = widget.existingMistakes
+        .where((mistake) => mistake.pageNumber == currentPage)
+        .toList();
+    for (final cluster in clusterQuranMistakes(mistakes)) {
+      final dx = cluster.xPosition - x;
+      final dy = cluster.yPosition - y;
+      if ((dx * dx) + (dy * dy) <= hitThreshold * hitThreshold) {
+        return cluster;
       }
     }
     return null;
+  }
+
+  void _showMistakeCluster(List<QuranMistake> mistakes) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(
+                  Icons.layers_outlined,
+                  color: AppThemeConstants.primary,
+                ),
+                title: Text(
+                  '${mistakes.length} ملاحظات في هذا الموضع',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('اختر ملاحظة لعرض تفاصيلها'),
+              ),
+              ...mistakes.map(
+                (mistake) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor:
+                        getMistakeColor(mistake.type).withValues(alpha: 0.15),
+                    child: Icon(
+                      Icons.error_outline,
+                      color: getMistakeColor(mistake.type),
+                    ),
+                  ),
+                  title: Text(mistake.type.arabicLabel),
+                  subtitle: Text(
+                    [
+                      if (mistake.wordText?.isNotEmpty == true)
+                        mistake.wordText!,
+                      if (mistake.correctionNote?.isNotEmpty == true)
+                        mistake.correctionNote!,
+                    ].join(' — '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.arrow_back_ios_new, size: 15),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showMistakeDetails(mistake);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -262,7 +413,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         builder: (context, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text('تحديد الخطأ'),
             content: SingleChildScrollView(
               child: Column(
@@ -282,7 +434,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       if (val != null) {
                         setDialogState(() {
                           selectedAyah = val;
-                          final verse = verses.firstWhere((v) => v['verse'] == val);
+                          final verse =
+                              verses.firstWhere((v) => v['verse'] == val);
                           selectedSurah = verse['surah'] as int;
                         });
                       }
@@ -327,7 +480,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       labelText: 'تعليق التصحيح',
                       hintText: 'اشرح الخطأ وكيفية التصحيح...',
                       helperText: 'إضافة تعليق ستظهر علامة زرقاء 🔵 على الآية',
-                      helperStyle: TextStyle(color: AppThemeConstants.accentBlueDark),
+                      helperStyle:
+                          TextStyle(color: AppThemeConstants.accentBlueDark),
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.chat_bubble_outline),
                     ),
@@ -415,12 +569,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               color: AppThemeConstants.accentBlueDark,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.chat_bubble, size: 7, color: AppThemeConstants.white),
+            child: const Icon(Icons.chat_bubble,
+                size: 7, color: AppThemeConstants.white),
           ),
           const SizedBox(width: 8),
           const Text(
             'العلامة الزرقاء = يوجد تعليق من المعلم — اضغط على العلامة لعرضه',
-            style: TextStyle(fontSize: 11, color: AppThemeConstants.accentBlueDark),
+            style: TextStyle(
+                fontSize: 11, color: AppThemeConstants.accentBlueDark),
           ),
         ],
       ),
@@ -453,7 +609,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         children: [
           // ── Previous page (→ RTL)
           IconButton(
-            icon: const Icon(Icons.arrow_forward),
+            icon: const Directionality(
+              textDirection: TextDirection.ltr,
+              child: Icon(Icons.arrow_forward),
+            ),
             onPressed:
                 currentPage > 1 ? () => _changePage(currentPage - 1) : null,
             tooltip: 'الصفحة السابقة',
@@ -466,82 +625,86 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               behavior: HitTestBehavior.translucent,
               onTap: _openJumpSheet,
               child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.grey50,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppThemeConstants.grey300),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppThemeConstants.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Page number + jump icon
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.menu_book,
-                          size: 14, color: AppThemeConstants.success),
-                      const SizedBox(width: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.grey50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppThemeConstants.grey300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeConstants.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Page number + jump icon
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.menu_book,
+                            size: 14, color: AppThemeConstants.success),
+                        const SizedBox(width: 5),
+                        Text(
+                          'صفحة $currentPage',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Icon(Icons.keyboard_arrow_up,
+                            size: 18, color: AppThemeConstants.grey500),
+                      ],
+                    ),
+                    // Juz label
+                    if (pageInfo != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        'صفحة $currentPage',
+                        'الجزء ${pageInfo!['juz']}',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 11, color: AppThemeConstants.grey600),
                       ),
-                      const SizedBox(width: 5),
-                      const Icon(Icons.keyboard_arrow_up,
-                          size: 18, color: AppThemeConstants.grey500),
                     ],
-                  ),
-                  // Juz label
-                  if (pageInfo != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'الجزء ${pageInfo!['juz']}',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppThemeConstants.grey600),
-                    ),
-                  ],
-                  // Mistakes badge
-                  if (mistakesOnPage > 0) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.warningLight,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppThemeConstants.accentOrange),
-                      ),
-                      child: Text(
-                        '$mistakesOnPage '
-                        '${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppThemeConstants.warningDark,
-                          fontWeight: FontWeight.w600,
+                    // Mistakes badge
+                    if (mistakesOnPage > 0) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppThemeConstants.warningLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border:
+                              Border.all(color: AppThemeConstants.accentOrange),
+                        ),
+                        child: Text(
+                          '$mistakesOnPage '
+                          '${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppThemeConstants.warningDark,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
           ),
 
           // ── Next page (← RTL)
           IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Directionality(
+              textDirection: TextDirection.ltr,
+              child: Icon(Icons.arrow_back),
+            ),
             onPressed: currentPage < QuranService.totalPages
                 ? () => _changePage(currentPage + 1)
                 : null,
@@ -558,34 +721,52 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   String _getMistakeTypeLabel(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:       return 'خطأ تجويد';
-      case MistakeType.pronunciation: return 'خطأ نطق';
-      case MistakeType.reading:       return 'قراءة خاطئة';
-      case MistakeType.skip:          return 'تجاوز';
-      case MistakeType.addition:      return 'زيادة';
-      case MistakeType.other:         return 'أخرى';
+      case MistakeType.tajweed:
+        return 'خطأ تجويد';
+      case MistakeType.pronunciation:
+        return 'خطأ نطق';
+      case MistakeType.reading:
+        return 'قراءة خاطئة';
+      case MistakeType.skip:
+        return 'تجاوز';
+      case MistakeType.addition:
+        return 'زيادة';
+      case MistakeType.other:
+        return 'أخرى';
     }
   }
 
   Color _getMistakeColor(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:       return AppThemeConstants.warning;
-      case MistakeType.pronunciation: return AppThemeConstants.error;
-      case MistakeType.reading:       return AppThemeConstants.accentPurple;
-      case MistakeType.skip:          return AppThemeConstants.accentBlue;
-      case MistakeType.addition:      return AppThemeConstants.success;
-      case MistakeType.other:         return AppThemeConstants.grey500;
+      case MistakeType.tajweed:
+        return AppThemeConstants.warning;
+      case MistakeType.pronunciation:
+        return AppThemeConstants.error;
+      case MistakeType.reading:
+        return AppThemeConstants.accentPurple;
+      case MistakeType.skip:
+        return AppThemeConstants.accentBlue;
+      case MistakeType.addition:
+        return AppThemeConstants.success;
+      case MistakeType.other:
+        return AppThemeConstants.grey500;
     }
   }
 
   IconData _getMistakeIcon(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:       return Icons.auto_fix_high;
-      case MistakeType.pronunciation: return Icons.record_voice_over;
-      case MistakeType.reading:       return Icons.error_outline;
-      case MistakeType.skip:          return Icons.fast_forward;
-      case MistakeType.addition:      return Icons.add_circle_outline;
-      case MistakeType.other:         return Icons.help_outline;
+      case MistakeType.tajweed:
+        return Icons.auto_fix_high;
+      case MistakeType.pronunciation:
+        return Icons.record_voice_over;
+      case MistakeType.reading:
+        return Icons.error_outline;
+      case MistakeType.skip:
+        return Icons.fast_forward;
+      case MistakeType.addition:
+        return Icons.add_circle_outline;
+      case MistakeType.other:
+        return Icons.help_outline;
     }
   }
 }
@@ -627,7 +808,8 @@ class _ZoomButton extends StatelessWidget {
                 : [],
           ),
           child: Icon(icon,
-              color: enabled ? AppThemeConstants.white : AppThemeConstants.grey500,
+              color:
+                  enabled ? AppThemeConstants.white : AppThemeConstants.grey500,
               size: 18),
         ),
       ),
@@ -661,7 +843,10 @@ class _JumpToSheetState extends State<_JumpToSheet>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
+    _tab = TabController(length: 3, vsync: this)
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     _searchCtrl.addListener(
       () => setState(() => _query = _searchCtrl.text.trim()),
     );
@@ -731,8 +916,8 @@ class _JumpToSheetState extends State<_JumpToSheet>
                     const SizedBox(width: 8),
                     const Text(
                       'الانتقال إلى',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
                     // Current position chip
@@ -742,7 +927,8 @@ class _JumpToSheetState extends State<_JumpToSheet>
                       decoration: BoxDecoration(
                         color: AppThemeConstants.successLight,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppThemeConstants.accentGreenAlt),
+                        border:
+                            Border.all(color: AppThemeConstants.accentGreenAlt),
                       ),
                       child: Text(
                         'ص ${widget.currentPage}',
@@ -758,35 +944,36 @@ class _JumpToSheetState extends State<_JumpToSheet>
               ),
               const SizedBox(height: 12),
 
-              // ── Search (Surah tab only) ────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _searchCtrl,
-                  textDirection: TextDirection.rtl,
-                  decoration: InputDecoration(
-                    hintText: 'ابحث عن سورة...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _query.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _query = '');
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+              if (_tab.index == 0) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    textDirection: TextDirection.rtl,
+                    decoration: InputDecoration(
+                      hintText: 'ابحث عن سورة...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _query = '');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      filled: true,
+                      fillColor: AppThemeConstants.grey50,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    filled: true,
-                    fillColor: AppThemeConstants.grey50,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
+              ],
 
               // ── Tabs ──────────────────────────────────────────────────
               TabBar(
@@ -803,6 +990,16 @@ class _JumpToSheetState extends State<_JumpToSheet>
                         Icon(Icons.format_list_numbered, size: 16),
                         SizedBox(width: 6),
                         Text('السور'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.numbers, size: 16),
+                        SizedBox(width: 6),
+                        Text('صفحة'),
                       ],
                     ),
                   ),
@@ -831,6 +1028,10 @@ class _JumpToSheetState extends State<_JumpToSheet>
                       scrollCtrl: scrollCtrl,
                       onSelected: widget.onPageSelected,
                     ),
+                    _PageJumpPanel(
+                      currentPage: widget.currentPage,
+                      onSelected: widget.onPageSelected,
+                    ),
                     _JuzList(
                       currentJuz: _currentJuzNumber(),
                       scrollCtrl: scrollCtrl,
@@ -841,6 +1042,99 @@ class _JumpToSheetState extends State<_JumpToSheet>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DIRECT PAGE TAB
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _PageJumpPanel extends StatefulWidget {
+  const _PageJumpPanel({
+    required this.currentPage,
+    required this.onSelected,
+  });
+
+  final int currentPage;
+  final void Function(int page) onSelected;
+
+  @override
+  State<_PageJumpPanel> createState() => _PageJumpPanelState();
+}
+
+class _PageJumpPanelState extends State<_PageJumpPanel> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.currentPage}');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final page = int.tryParse(_controller.text.trim());
+    if (page == null || page < 1 || page > QuranService.totalPages) {
+      setState(() {
+        _errorText = 'أدخل رقمًا من 1 إلى ${QuranService.totalPages}';
+      });
+      return;
+    }
+    widget.onSelected(page);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.menu_book_rounded,
+              size: 56,
+              color: AppThemeConstants.success,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'الانتقال إلى رقم صفحة',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: false,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: 'رقم الصفحة',
+                errorText: _errorText,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _submit,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('انتقال'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -875,11 +1169,13 @@ class _SurahList extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off, size: 48, color: AppThemeConstants.grey300),
+            const Icon(Icons.search_off,
+                size: 48, color: AppThemeConstants.grey300),
             const SizedBox(height: 12),
             Text(
               'لا توجد نتائج لـ "$query"',
-              style: const TextStyle(color: AppThemeConstants.grey500, fontSize: 14),
+              style: const TextStyle(
+                  color: AppThemeConstants.grey500, fontSize: 14),
             ),
           ],
         ),
@@ -898,12 +1194,13 @@ class _SurahList extends StatelessWidget {
         final isCurrent = surahNum == currentSurah;
 
         return Material(
-          color: isCurrent ? AppThemeConstants.successLight : AppThemeConstants.transparent,
+          color: isCurrent
+              ? AppThemeConstants.successLight
+              : AppThemeConstants.transparent,
           child: InkWell(
             onTap: () => onSelected(page),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   // Surah number circle
@@ -940,9 +1237,8 @@ class _SurahList extends StatelessWidget {
                     child: Text(
                       name,
                       style: TextStyle(
-                        fontWeight: isCurrent
-                            ? FontWeight.bold
-                            : FontWeight.w500,
+                        fontWeight:
+                            isCurrent ? FontWeight.bold : FontWeight.w500,
                         fontSize: 16,
                         color: isCurrent
                             ? AppThemeConstants.successDark
@@ -960,8 +1256,8 @@ class _SurahList extends StatelessWidget {
 
                   // Page badge
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: isCurrent
                           ? AppThemeConstants.successLight
@@ -975,9 +1271,8 @@ class _SurahList extends StatelessWidget {
                         color: isCurrent
                             ? AppThemeConstants.successDark
                             : AppThemeConstants.grey600,
-                        fontWeight: isCurrent
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                        fontWeight:
+                            isCurrent ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -1028,7 +1323,9 @@ class _JuzList extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              color: isCurrent ? AppThemeConstants.success : AppThemeConstants.successLight,
+              color: isCurrent
+                  ? AppThemeConstants.success
+                  : AppThemeConstants.successLight,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isCurrent
@@ -1051,7 +1348,9 @@ class _JuzList extends StatelessWidget {
               children: [
                 Icon(
                   isCurrent ? Icons.location_on : Icons.book_outlined,
-                  color: isCurrent ? AppThemeConstants.white : AppThemeConstants.success,
+                  color: isCurrent
+                      ? AppThemeConstants.white
+                      : AppThemeConstants.success,
                   size: 20,
                 ),
                 const SizedBox(height: 5),
@@ -1060,7 +1359,9 @@ class _JuzList extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: isCurrent ? AppThemeConstants.white : AppThemeConstants.successDark,
+                    color: isCurrent
+                        ? AppThemeConstants.white
+                        : AppThemeConstants.successDark,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1081,6 +1382,3 @@ class _JuzList extends StatelessWidget {
     );
   }
 }
-
-
-

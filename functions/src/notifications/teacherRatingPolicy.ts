@@ -38,6 +38,7 @@ export function countsTowardTeacherRating(
   data: SessionRatingData
 ): boolean {
   return (
+    data.teacherRatingScale === 5 &&
     normalizeTeacherRating(data) != null &&
     data.teacherRatingReason !== 'technical_only'
   );

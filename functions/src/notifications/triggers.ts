@@ -637,11 +637,16 @@ export const onTeacherRated = functions.firestore
         }
 
         const data = teacherDoc.data() as Record<string, unknown>;
-        const storedOldRating = asNumber(data.rating, 0);
-        const oldRating =
-          storedOldRating > 5 ? storedOldRating / 2 : storedOldRating;
-        const oldCount = asNumber(data.reviewCount, 0);
-        const oldSum = asNumber(data.ratingSum, oldRating * oldCount);
+        const usesCurrentPolicy = asNumber(data.ratingPolicyVersion, 0) === 2;
+        const oldCount = usesCurrentPolicy
+          ? asNumber(data.reviewCount, 0)
+          : 0;
+        const oldSum = usesCurrentPolicy
+          ? asNumber(
+              data.ratingSum,
+              asNumber(data.rating, 0) * oldCount,
+            )
+          : 0;
 
         const newCount = oldCount + 1;
         const newSum = oldSum + afterRating;
@@ -651,6 +656,7 @@ export const onTeacherRated = functions.firestore
           rating: Math.round(newAvg * 10) / 10,
           ratingScale: 5,
           ratingSum: newSum,
+          ratingPolicyVersion: 2,
           reviewCount: newCount,
           updatedAt: FieldValue.serverTimestamp(),
         });
