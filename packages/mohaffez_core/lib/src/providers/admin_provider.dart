@@ -374,6 +374,14 @@ final adminUserNotificationsProvider = StreamProvider.autoDispose
   return ref.watch(adminRepositoryProvider).watchUserNotifications(userId);
 });
 
+double? _teacherRatingOnFivePointScale(Map<String, dynamic> session) {
+  final raw = (session['teacherRating'] as num?)?.toDouble();
+  if (raw == null || raw <= 0) return null;
+  final scale = (session['teacherRatingScale'] as num?)?.toInt();
+  if (scale == 10 || (scale == null && raw > 5)) return raw / 2;
+  return raw <= 5 ? raw : null;
+}
+
 /// Aggregated teaching statistics for one mohaffez, computed from hafizSessions.
 class TeacherStats {
   final int total;
@@ -427,8 +435,8 @@ final teacherStatsProvider = FutureProvider.autoDispose
       cancelled++;
     }
 
-    final r = (s['teacherRating'] as num?)?.toDouble();
-    if (r != null && r > 0) {
+    final r = _teacherRatingOnFivePointScale(s);
+    if (r != null && s['teacherRatingReason'] != 'technical_only') {
       ratingSum += r;
       ratingCount++;
     }

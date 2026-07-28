@@ -369,6 +369,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             },
           ),
           GoRoute(
+            path: '/interactive-quran',
+            name: 'interactive-quran',
+            builder: (context, state) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('المصحف التفاعلي'),
+                    backgroundColor: AppThemeConstants.primary,
+                  ),
+                  body: InteractiveQuranPage(
+                    pageNumber: 1,
+                    onMistakeAdded: (_) {},
+                    isEditable: false,
+                  ),
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: '/requests',
             name: 'requests',
             builder: (context, state) => const StudentRequestsScreen(),

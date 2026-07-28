@@ -472,7 +472,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       return;
     }
 
-    final result = await Navigator.push<bool>(
+    final result = await Navigator.push<int>(
       context,
       MaterialPageRoute(
         builder: (_) => RateSessionScreen(
@@ -482,7 +482,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       ),
     );
 
-    if (result == true && mounted) {
+    if (result != null && mounted) {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1228,7 +1228,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
               onPressed: () => navigateToRating(session),
               icon: const Icon(Icons.star, color: AppThemeConstants.white),
               label: const Text(
-                'تقييم الجلسة',
+                'تقييم أداء المحفظ',
                 style: TextStyle(fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(

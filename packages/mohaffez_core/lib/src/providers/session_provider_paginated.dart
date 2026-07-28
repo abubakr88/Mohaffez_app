@@ -1101,6 +1101,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     String? notes,
     int? rating,
     bool? startedLate,
+    String? technicalIssueSource,
+    String? teacherRatingReason,
   }) async {
     final updates = <String, dynamic>{};
     if (hifz != null) updates['hifzAssignment'] = hifz;
@@ -1108,10 +1110,17 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (notes != null) updates['reviewNotes'] = notes;
     if (rating != null) {
       updates['teacherRating'] = rating;
+      updates['teacherRatingScale'] = 5;
       updates['teacherRatedAt'] = FieldValue.serverTimestamp();
       updates['updatedAt'] = FieldValue.serverTimestamp();
     }
     if (startedLate != null) updates['startedLate'] = startedLate;
+    if (technicalIssueSource != null) {
+      updates['technicalIssueSource'] = technicalIssueSource;
+    }
+    if (teacherRatingReason != null) {
+      updates['teacherRatingReason'] = teacherRatingReason;
+    }
     if (updates.isNotEmpty) {
       await updateSession(sessionId, updates);
 

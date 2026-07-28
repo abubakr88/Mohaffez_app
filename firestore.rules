@@ -19,6 +19,49 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
+    function hasValidStudentRatingUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let ratingFields = [
+        'studentFeedback',
+        'teacherRating',
+        'teacherRatingScale',
+        'teacherRatedAt',
+        'teacherRatingReason',
+        'technicalIssueSource',
+        'reviewNotes',
+        'startedLate'
+      ];
+      let isFirstRating = resource.data.get('teacherRating', 0) == 0 &&
+                          request.resource.data.teacherRating is int;
+      let isLegacyRating = request.resource.data.get('teacherRatingScale', 0) == 0 &&
+                           request.resource.data.teacherRating >= 1 &&
+                           request.resource.data.teacherRating <= 10;
+      let issueSource = request.resource.data.get('technicalIssueSource', '');
+      let reason = request.resource.data.get('teacherRatingReason', '');
+      let isNewRating = request.resource.data.get('teacherRatingScale', 0) == 5 &&
+                        request.resource.data.teacherRating >= 1 &&
+                        request.resource.data.teacherRating <= 5 &&
+                        issueSource in ['none', 'student', 'teacher', 'app', 'unknown'] &&
+                        (
+                          request.resource.data.teacherRating > 2 ||
+                          reason in [
+                            'unclear_explanation',
+                            'weak_interaction',
+                            'unprepared',
+                            'inappropriate_behavior',
+                            'technical_only',
+                            'other'
+                          ]
+                        ) &&
+                        (reason != 'technical_only' || issueSource != 'none');
+      return !changed.hasAny(ratingFields) ||
+             (
+               changed.hasAny(['teacherRating']) &&
+               isFirstRating &&
+               (isLegacyRating || isNewRating)
+             );
+    }
+
     function minimumTeacherHourlyRateEgp() {
       let configPath = /databases/$(database)/documents/systemConfig/global;
       return exists(configPath)
@@ -560,7 +603,8 @@ service cloud.firestore {
            .hasAny(['meeting', 'meetingReminderSent', 'meetingReminderSentAt']))
         ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'teacherRating', 'teacherRatedAt', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']) &&
+         onlyUpdating(['studentFeedback', 'teacherRating', 'teacherRatingScale', 'teacherRatedAt', 'teacherRatingReason', 'technicalIssueSource', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']) &&
+         hasValidStudentRatingUpdate() &&
          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['teacherRatedAt']) ||
           request.resource.data.teacherRatedAt == request.time))
         ||

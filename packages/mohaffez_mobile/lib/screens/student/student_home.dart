@@ -429,6 +429,8 @@ class StudentHomeContent extends ConsumerWidget {
                         learnerName: nextSessionLearnerName,
                       ),
                       if (nextSessionDate != null) const SizedBox(height: 20),
+                      const _QuranAccessCard(),
+                      const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
                       _QuizAccessCard(studentId: studentId),
@@ -983,6 +985,132 @@ class _StatCard extends StatelessWidget {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERACTIVE QURAN ACCESS
+// ═══════════════════════════════════════════════════════════════════════════════
+class _QuranAccessCard extends StatelessWidget {
+  const _QuranAccessCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'فتح المصحف التفاعلي',
+      child: Material(
+        color: AppThemeConstants.transparent,
+        borderRadius: _DS.r16,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.push('/interactive-quran');
+          },
+          borderRadius: _DS.r16,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: AlignmentDirectional.topStart,
+                end: AlignmentDirectional.bottomEnd,
+                colors: [_DS.teal800, _DS.teal600],
+              ),
+              borderRadius: _DS.r16,
+              border: Border.all(
+                color: AppThemeConstants.secondary.withValues(alpha: 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _DS.teal700.withValues(alpha: 0.22),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                PositionedDirectional(
+                  end: -18,
+                  top: -26,
+                  child: Icon(
+                    Icons.auto_stories_rounded,
+                    size: 112,
+                    color: AppThemeConstants.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.14),
+                          borderRadius: _DS.r12,
+                          border: Border.all(
+                            color:
+                                AppThemeConstants.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.menu_book_rounded,
+                          size: 29,
+                          color: AppThemeConstants.secondary,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'المصحف التفاعلي',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: AppThemeConstants.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'تصفح الصفحات والسور والأجزاء',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.78),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 16,
+                          color: AppThemeConstants.white.withValues(alpha: 0.9),
+                        ),
                       ),
                     ],
                   ),

@@ -245,12 +245,12 @@ int _compareMohaffezResults(
 
   final selectedSortCompare = switch (params.sortBy) {
     SortType.distance => _compareDistance(a, b, params),
-    SortType.rating => b.rating.compareTo(a.rating),
+    SortType.rating => b.reputationScore.compareTo(a.reputationScore),
     SortType.followers => b.followerCount.compareTo(a.followerCount),
   };
   if (selectedSortCompare != 0) return selectedSortCompare;
 
-  final ratingCompare = b.rating.compareTo(a.rating);
+  final ratingCompare = b.reputationScore.compareTo(a.reputationScore);
   if (ratingCompare != 0) return ratingCompare;
 
   return a.name.toLowerCase().compareTo(b.name.toLowerCase());

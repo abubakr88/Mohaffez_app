@@ -1603,11 +1603,12 @@ Future<void> _showTeacherRatings(
               icon: Icons.star_rounded,
               label: stats.avgRating == null
                   ? 'لا يوجد متوسط'
-                  : 'المتوسط ${stats.avgRating!.toStringAsFixed(1)} من 10',
+                  : 'المتوسط ${stats.avgRating!.toStringAsFixed(1)} من 5',
             ),
             _RatingSummaryChip(
               icon: Icons.rate_review_outlined,
-              label: '${stats.ratingCount} تقييم',
+              label:
+                  '${stats.ratingCount} تقييم محتسب من ${stats.ratings.length} مرسل',
             ),
           ],
         ),
@@ -1669,6 +1670,11 @@ class _TeacherRatingItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final score = (rating['teacherRating'] as num?)?.toDouble() ?? 0;
+    final scoreScale =
+        (rating['teacherRatingScale'] as num?)?.toInt() ?? (score > 5 ? 10 : 5);
+    final isExcluded = rating['teacherRatingReason'] == 'technical_only';
+    final technicalIssueSource =
+        _technicalIssueSourceLabel(rating['technicalIssueSource']);
     final learnerName = _nullableText(
           rating,
           const ['studentProfileName', 'learnerName', 'studentName'],
@@ -1755,7 +1761,7 @@ class _TeacherRatingItem extends StatelessWidget {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      '${score.toStringAsFixed(score % 1 == 0 ? 0 : 1)}/10',
+                      '${score.toStringAsFixed(score % 1 == 0 ? 0 : 1)}/$scoreScale',
                       style: DSText.bodyMedium(
                         context,
                         color: DSColors.secondary,
@@ -1767,6 +1773,20 @@ class _TeacherRatingItem extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DSSpacing.md),
+          if (isExcluded) ...[
+            Text(
+              'مستبعد من المتوسط العام: بلاغ تقني فقط',
+              style: DSText.caption(context, color: DSColors.primary),
+            ),
+            const SizedBox(height: DSSpacing.xs),
+          ],
+          if (technicalIssueSource != null) ...[
+            Text(
+              'المشكلة التقنية: $technicalIssueSource',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+            const SizedBox(height: DSSpacing.xs),
+          ],
           Text(
             comment ?? 'لم يضف الطالب تعليقًا.',
             style: DSText.body(
@@ -1778,6 +1798,17 @@ class _TeacherRatingItem extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _technicalIssueSourceLabel(dynamic source) {
+  return switch (source) {
+    'none' => 'لم توجد مشكلة',
+    'student' => 'اتصال الطالب',
+    'teacher' => 'اتصال المحفظ',
+    'app' => 'التطبيق أو رابط الاجتماع',
+    'unknown' => 'المصدر غير معروف',
+    _ => null,
+  };
 }
 
 class _CredentialsSection extends ConsumerWidget {

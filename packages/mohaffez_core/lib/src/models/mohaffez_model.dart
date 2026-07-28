@@ -13,6 +13,7 @@ class MohaffezModel {
   final double? addressLng;
   final String? addressText;
   final double rating;
+  final int reviewCount;
   final int followerCount;
   final String? bio;
   final String? phoneNumber;
@@ -32,6 +33,7 @@ class MohaffezModel {
     this.addressLng,
     this.addressText,
     this.rating = 0.0,
+    this.reviewCount = 0,
     this.followerCount = 0,
     this.bio,
     this.phoneNumber,
@@ -58,6 +60,7 @@ class MohaffezModel {
       addressLng: (data['addressLng'] as num?)?.toDouble(),
       addressText: data['addressText'] as String?,
       rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: (data['reviewCount'] as num?)?.toInt() ?? 0,
       followerCount: data['followerCount'] as int? ?? 0,
       bio: data['bio'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
@@ -70,6 +73,18 @@ class MohaffezModel {
   }
 
   String get displayName => composeTeacherDisplayName(name, honorific);
+
+  /// Confidence-adjusted score used for ordering teachers. Five prior reviews
+  /// at the neutral-positive platform baseline prevent one early review from
+  /// placing a new teacher at the top or bottom of the list.
+  double get reputationScore {
+    if (reviewCount <= 0 || rating <= 0) return 0;
+    const priorRating = 4.0;
+    const priorWeight = 5;
+    final normalizedRating = rating.clamp(0.0, 5.0);
+    return ((normalizedRating * reviewCount) + (priorRating * priorWeight)) /
+        (reviewCount + priorWeight);
+  }
 
   // Calculate distance from user location
   double? getDistanceFrom(double? userLat, double? userLng) {

@@ -304,7 +304,11 @@ class _CompletedAssignmentCardState
 
     if (result != null && result > 0 && mounted) {
       // Immediately show the real rating without waiting for the provider re-fetch
-      setState(() => session = {...session, 'teacherRating': result});
+      setState(() => session = {
+            ...session,
+            'teacherRating': result,
+            'teacherRatingScale': 5,
+          });
       ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -345,6 +349,8 @@ class _CompletedAssignmentCardState
     final previousMurajaRating = session['previousMurajaRating'] as int? ?? 0;
     final performanceNotes = session['performanceNotes'] as String?;
     final teacherRating = session['teacherRating'] as int? ?? 0;
+    final teacherRatingScale =
+        session['teacherRatingScale'] as int? ?? (teacherRating > 5 ? 10 : 5);
     final sessionNotes = session['sessionNotes'] as String?;
 
     return Card(
@@ -674,7 +680,7 @@ class _CompletedAssignmentCardState
                             size: 16, color: AppThemeConstants.secondary),
                         const SizedBox(width: 4),
                         Text(
-                          '$teacherRating/10',
+                          '$teacherRating/$teacherRatingScale',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
