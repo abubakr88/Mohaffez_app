@@ -9,6 +9,74 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "studentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "challengeAccess.status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "mohaffezId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sessionDate",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "mohaffezId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studentProfileId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sessionDate",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "mohaffezId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "slotStart",
           "order": "ASCENDING"
         }

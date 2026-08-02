@@ -853,10 +853,10 @@ class _ActionsSection extends StatelessWidget {
           onTap: () => context.push('/credentials')),
       _ActionData(
           icon: Icons.quiz_rounded,
-          label: 'التحديات',
+          label: 'تحديات الطلاب',
           color: _DS.amber,
           bg: _DS.amberBg,
-          onTap: () => context.push('/session-quiz')),
+          onTap: () => context.push('/my-students')),
     ];
 
     return Column(

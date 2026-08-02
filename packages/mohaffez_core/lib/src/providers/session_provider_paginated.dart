@@ -247,13 +247,20 @@ final studentUpcomingSessionsProvider =
             }).map((doc) {
               final data = doc.data();
               return <String, dynamic>{
+                ...data,
                 'id': doc.id,
                 'sessionDate': _parseSessionDateTime(
                   (data['sessionDate'] as Timestamp?)?.toDate(),
                   data['preferredTimeSlot'] as String? ??
                       data['timeSlot'] as String?,
                 ),
+                'slotStart': (data['slotStart'] as Timestamp?)?.toDate(),
+                'slotEnd': (data['slotEnd'] as Timestamp?)?.toDate(),
+                'mohaffezId': data['mohaffezId'] as String? ?? '',
                 'mohaffezName': data['mohaffezName'] as String? ?? '',
+                'studentId': data['studentId'] as String? ?? studentId,
+                'studentProfileId': data['studentProfileId'] as String?,
+                'studentProfileName': data['studentProfileName'] as String?,
                 'isPaid': data['isPaid'] as bool? ?? false,
                 'isTrial': data['isTrial'] as bool? ?? false,
                 'bookingKind': data['bookingKind'] as String?,
@@ -1161,6 +1168,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'sessionRating': sessionRating,
         'isLateCompletion': isLateCompletion,
         'quizUnlocked': false,
+        'challengeAccess.status': 'closed',
       };
 
       if (previousHifzCompleted != null) {

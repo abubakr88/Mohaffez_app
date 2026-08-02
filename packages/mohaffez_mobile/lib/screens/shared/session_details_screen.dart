@@ -1098,6 +1098,9 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
               '/complete-session/${session.id}',
               extra: {
                 'studentName': session.studentName,
+                'mohaffezId': session.mohaffezId,
+                'studentId': session.studentId,
+                'studentProfileId': session.studentProfileId,
                 'previousHifz': session.hifzAssignment,
                 'previousMuraja': session.murajaAssignment,
               },

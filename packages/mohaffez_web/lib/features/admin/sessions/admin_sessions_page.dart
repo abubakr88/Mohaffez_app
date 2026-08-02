@@ -6,15 +6,20 @@ import '../../../design_system/design_system.dart';
 
 // ── Filter options ───────────────────────────────────────────────────────────
 const _kFilters = <({String? key, String label})>[
-  (key: null,        label: 'الكل'),
-  (key: 'live',      label: 'قيد التنفيذ'),
+  (key: null, label: 'الكل'),
+  (key: 'live', label: 'قيد التنفيذ'),
   (key: 'completed', label: 'منجزة'),
   (key: 'cancelled', label: 'ملغاة'),
-  (key: 'pending',   label: 'بانتظار الموافقة'),
+  (key: 'pending', label: 'بانتظار الموافقة'),
 ];
 
 class AdminSessionsPage extends ConsumerStatefulWidget {
-  const AdminSessionsPage({super.key});
+  const AdminSessionsPage({
+    super.key,
+    this.initialFilter,
+  });
+
+  final String? initialFilter;
 
   @override
   ConsumerState<AdminSessionsPage> createState() => _AdminSessionsPageState();
@@ -23,6 +28,20 @@ class AdminSessionsPage extends ConsumerStatefulWidget {
 class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
   String? _filter;
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.initialFilter;
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminSessionsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialFilter != widget.initialFilter) {
+      _filter = widget.initialFilter;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,8 +65,10 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
               tabletColumns: 4,
               desktopColumns: 4,
               children: [
-                DSSkeletonCard(), DSSkeletonCard(),
-                DSSkeletonCard(), DSSkeletonCard(),
+                DSSkeletonCard(),
+                DSSkeletonCard(),
+                DSSkeletonCard(),
+                DSSkeletonCard(),
               ],
             ),
             error: (_, __) => const SizedBox.shrink(),
@@ -67,8 +88,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                 DSStatCard(
                   label: 'منجزة هذا الشهر',
                   value: '${m.sessions.completedThisMonth}',
-                  trend: _intDelta(
-                      m.sessions.completedThisMonth,
+                  trend: _intDelta(m.sessions.completedThisMonth,
                       m.sessions.completedLastMonth),
                   trendPositive: m.sessions.completedThisMonth >=
                       m.sessions.completedLastMonth,
@@ -112,8 +132,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                             child: _FilterChip(
                               label: f.label,
                               selected: _filter == f.key,
-                              onTap: () =>
-                                  setState(() => _filter = f.key),
+                              onTap: () => setState(() => _filter = f.key),
                             ),
                           ))
                       .toList(),
@@ -192,8 +211,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                                 ?.millisecondsSinceEpoch ??
                             0,
                         cellBuilder: (ctx, s) {
-                          final dt =
-                              _ts(s['sessionDate'] ?? s['slotStart']);
+                          final dt = _ts(s['sessionDate'] ?? s['slotStart']);
                           return Text(
                             dt == null
                                 ? '—'
@@ -209,8 +227,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                         sortValue: (s) =>
                             (s['mohaffezName'] as String? ?? '').toLowerCase(),
                         cellBuilder: (ctx, s) {
-                          final name =
-                              s['mohaffezName'] as String? ?? '—';
+                          final name = s['mohaffezName'] as String? ?? '—';
                           return Row(
                             children: [
                               DSAvatar(name: name, size: 28),
@@ -231,8 +248,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                         sortValue: (s) =>
                             (s['studentName'] as String? ?? '').toLowerCase(),
                         cellBuilder: (ctx, s) {
-                          final name =
-                              s['studentName'] as String? ?? '—';
+                          final name = s['studentName'] as String? ?? '—';
                           return Row(
                             children: [
                               DSAvatar(name: name, size: 28),
@@ -281,12 +297,10 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                         sortValue: (s) =>
                             (s['sessionPrice'] as num?)?.toDouble() ?? 0.0,
                         cellBuilder: (ctx, s) {
-                          final price =
-                              (s['sessionPrice'] as num?)?.toDouble();
+                          final price = (s['sessionPrice'] as num?)?.toDouble();
                           if (price == null || price == 0) {
                             return Text('—',
-                                style:
-                                    DSText.body(ctx, color: DSColors.text3));
+                                style: DSText.body(ctx, color: DSColors.text3));
                           }
                           return Text(
                             _money(price),
@@ -332,35 +346,35 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
       '${NumberFormat.decimalPattern('ar').format(v.round())} ج.م';
 
   static String _statusLabel(String s) => switch (s) {
-        'pending'   => 'انتظار',
-        'accepted'  => 'مقبولة',
+        'pending' => 'انتظار',
+        'accepted' => 'مقبولة',
         'completed' => 'منجزة',
         'cancelled' => 'ملغاة',
-        'refunded'  => 'مُرجعة',
-        _           => s,
+        'refunded' => 'مُرجعة',
+        _ => s,
       };
 
   static DSBadgeVariant _statusVariant(String s) => switch (s) {
-        'pending'   => DSBadgeVariant.warning,
-        'accepted'  => DSBadgeVariant.primary,
+        'pending' => DSBadgeVariant.warning,
+        'accepted' => DSBadgeVariant.primary,
         'completed' => DSBadgeVariant.success,
         'cancelled' => DSBadgeVariant.error,
-        'refunded'  => DSBadgeVariant.neutral,
-        _           => DSBadgeVariant.neutral,
+        'refunded' => DSBadgeVariant.neutral,
+        _ => DSBadgeVariant.neutral,
       };
 
   static String _typeLabel(String t) => switch (t) {
-        'online'  => 'أونلاين',
-        'mosque'  => 'مسجد',
-        'home'    => 'منزل',
-        _         => t,
+        'online' => 'أونلاين',
+        'mosque' => 'مسجد',
+        'home' => 'منزل',
+        _ => t,
       };
 
   static DSBadgeVariant _typeVariant(String t) => switch (t) {
         'online' => DSBadgeVariant.info,
         'mosque' => DSBadgeVariant.primary,
-        'home'   => DSBadgeVariant.neutral,
-        _        => DSBadgeVariant.neutral,
+        'home' => DSBadgeVariant.neutral,
+        _ => DSBadgeVariant.neutral,
       };
 }
 
@@ -400,7 +414,8 @@ class _RefundCell extends ConsumerWidget {
   }
 
   Future<void> _confirm(BuildContext context, WidgetRef ref) async {
-    final id = session['id'] as String? ?? session['sessionId'] as String? ?? '';
+    final id =
+        session['id'] as String? ?? session['sessionId'] as String? ?? '';
     if (id.isEmpty) return;
     final student = session['studentName'] as String? ?? 'الطالب';
     final price = (session['sessionPrice'] as num?)?.toDouble() ?? 0;
@@ -484,8 +499,8 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? DSColors.primary : DSColors.surface,
             borderRadius: DSRadius.fullAll,
-            border:
-                Border.all(color: selected ? DSColors.primary : DSColors.border),
+            border: Border.all(
+                color: selected ? DSColors.primary : DSColors.border),
           ),
           child: Text(
             label,

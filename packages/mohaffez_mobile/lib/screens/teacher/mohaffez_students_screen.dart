@@ -604,6 +604,7 @@ class _StudentsViewSelector extends StatelessWidget {
           border: Border.all(color: AppThemeConstants.grey300),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: _StudentsViewButton(
@@ -862,6 +863,7 @@ class _SegmentedFilter extends StatelessWidget {
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: _Segment.values.map((s) {
           final isSelected = s == selected;
           return Expanded(

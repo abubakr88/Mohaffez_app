@@ -48,6 +48,9 @@ import '../screens/student/direct_payment_screen.dart';
 import '../screens/student/active_subscriptions_screen.dart';
 import '../screens/student/student_wallet_screen.dart';
 import '../screens/student/wallet_topup_screen.dart';
+import '../screens/student/student_challenge_screen.dart';
+import '../screens/student/student_live_recitation_screen.dart';
+import '../providers/quiz_access_provider.dart';
 // Teacher screens
 import '../screens/teacher/mohaffez_home.dart';
 import '../screens/teacher/mohaffez_credentials_screen.dart';
@@ -64,7 +67,7 @@ import '../screens/teacher/direct_payment_confirmations_screen.dart';
 import '../screens/teacher/completed_sessions_screen.dart';
 import '../screens/teacher/upcoming_sessions_screen.dart';
 import '../screens/teacher/session_quiz_screen.dart';
-import '../screens/teacher/student_challenges_screen.dart';
+import '../screens/teacher/student_challenges_v2_screen.dart';
 import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
 import '../screens/teacher/teacher_pending_screen.dart';
@@ -76,6 +79,7 @@ import '../screens/shared/admin_web_only_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../screens/student/student_interactive_quran_screen.dart';
 import '../shared/theme/theme_extensions.dart';
+import '../tour/tour_mode_state.dart';
 import 'guard_manager.dart';
 
 // GoRouter Notifier for auth state changes
@@ -373,6 +377,34 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/interactive-quran',
             name: 'interactive-quran',
             builder: (context, state) => const StudentInteractiveQuranScreen(),
+          ),
+          GoRoute(
+            path: '/student-challenge',
+            name: 'student-challenge',
+            builder: (context, state) {
+              if (ref.read(tourModeProvider).active) {
+                return ErrorScreen(
+                  error: 'التحديات متاحة للحسابات المسجّلة فقط',
+                  onRetry: () => context.go('/home'),
+                );
+              }
+              return StudentChallengeScreen(
+                sessionChallenge: state.extra is SessionChallengeInfo
+                    ? state.extra as SessionChallengeInfo
+                    : null,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/live-recitation/:sessionId',
+            name: 'live-recitation',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return StudentLiveRecitationScreen(
+                sessionId: state.pathParameters['sessionId'] ?? '',
+                mohaffezName: extra?['mohaffezName'] as String?,
+              );
+            },
           ),
           GoRoute(
             path: '/requests',
@@ -741,6 +773,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               return SessionCompletionScreen(
                 sessionId: sessionId,
                 studentName: extra?['studentName'] ?? '',
+                mohaffezId: extra?['mohaffezId'] as String?,
+                studentId: extra?['studentId'] as String?,
+                studentProfileId: extra?['studentProfileId'] as String?,
                 previousHifz: extra?['previousHifz'],
                 previousMuraja: extra?['previousMuraja'],
                 previousHifzFromAyah: extra?['previousHifzFromAyah'] as String?,
@@ -770,11 +805,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'session-quiz',
             builder: (context, state) {
               final p = state.uri.queryParameters;
+              final extra = state.extra as Map<String, dynamic>?;
               return SessionQuizScreen(
-                studentName: p['studentName'],
-                mohaffezId: p['mohaffezId'],
-                studentId: p['studentId'],
-                sessionId: p['sessionId'],
+                studentName:
+                    extra?['studentName'] as String? ?? p['studentName'],
+                mohaffezId: extra?['mohaffezId'] as String? ?? p['mohaffezId'],
+                studentId: extra?['studentId'] as String? ?? p['studentId'],
+                studentProfileId: extra?['studentProfileId'] as String? ??
+                    p['studentProfileId'],
+                sessionId: extra?['sessionId'] as String? ?? p['sessionId'],
+                previousHifz: extra?['previousHifz'] as String?,
+                previousMuraja: extra?['previousMuraja'] as String?,
+                previousHifzFromAyah: extra?['previousHifzFromAyah'] as String?,
+                previousHifzToAyah: extra?['previousHifzToAyah'] as String?,
+                previousMurajaFromAyah:
+                    extra?['previousMurajaFromAyah'] as String?,
+                previousMurajaToAyah: extra?['previousMurajaToAyah'] as String?,
               );
             },
           ),
@@ -783,10 +829,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'student-challenges',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>;
-              return StudentChallengesScreen(
+              return StudentChallengesV2Screen(
                 mohaffezId: extra['mohaffezId'] as String,
                 studentId: extra['studentId'] as String,
+                studentProfileId: extra['studentProfileId'] as String?,
                 studentName: extra['studentName'] as String,
+                initialSessions:
+                    (extra['sessions'] as List<dynamic>? ?? const [])
+                        .whereType<Map>()
+                        .map((item) => Map<String, dynamic>.from(item))
+                        .toList(),
               );
             },
           ),

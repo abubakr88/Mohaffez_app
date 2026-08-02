@@ -11,6 +11,7 @@ class SystemConfigModel {
   final int paymentDeadlineHours;
   final int promoCodeMaxDiscount;
   final bool freeSessionEnabled;
+  final bool challengeV2Enabled;
   final int maxActiveSubscriptions;
   final int slotLockDurationMinutes;
   final int maxPendingRequestsPerStudent;
@@ -73,6 +74,7 @@ class SystemConfigModel {
     required this.paymentDeadlineHours,
     required this.promoCodeMaxDiscount,
     required this.freeSessionEnabled,
+    required this.challengeV2Enabled,
     required this.maxActiveSubscriptions,
     required this.slotLockDurationMinutes,
     required this.maxPendingRequestsPerStudent,
@@ -141,6 +143,8 @@ class SystemConfigModel {
           defaults.promoCodeMaxDiscount,
       freeSessionEnabled:
           data['freeSessionEnabled'] as bool? ?? defaults.freeSessionEnabled,
+      challengeV2Enabled:
+          data['challengeV2Enabled'] as bool? ?? defaults.challengeV2Enabled,
       maxActiveSubscriptions:
           (data['maxActiveSubscriptions'] as num?)?.toInt() ??
               defaults.maxActiveSubscriptions,
@@ -244,6 +248,7 @@ class SystemConfigModel {
       paymentDeadlineHours: 48,
       promoCodeMaxDiscount: 100,
       freeSessionEnabled: true,
+      challengeV2Enabled: true,
       maxActiveSubscriptions: 3,
       slotLockDurationMinutes: 120,
       maxPendingRequestsPerStudent: 5,
@@ -296,6 +301,7 @@ class SystemConfigModel {
       'paymentDeadlineHours': paymentDeadlineHours,
       'promoCodeMaxDiscount': promoCodeMaxDiscount,
       'freeSessionEnabled': freeSessionEnabled,
+      'challengeV2Enabled': challengeV2Enabled,
       'maxActiveSubscriptions': maxActiveSubscriptions,
       'slotLockDurationMinutes': slotLockDurationMinutes,
       'maxPendingRequestsPerStudent': maxPendingRequestsPerStudent,

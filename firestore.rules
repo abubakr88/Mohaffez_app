@@ -429,9 +429,23 @@ service cloud.firestore {
       // Teacher (userId == mohaffezId) has full write access.
       // Student can read their own questions when a session is active.
       match /studentChallenges/{studentId}/questions/{questionId} {
-        allow read: if isOwner(userId) || request.auth.uid == studentId;
+        allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // V2 consolidated challenge bank: one read/save per learner.
+      // Answers remain private to the owning teacher.
+      match /studentChallengeBanks/{learnerKey} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          request.resource.data.learnerKey == learnerKey &&
+          request.resource.data.studentId is string &&
+          request.resource.data.studentProfileId is string &&
+          request.resource.data.schemaVersion == 2 &&
+          request.resource.data.questions is list &&
+          request.resource.data.questions.size() <= 30;
         allow delete: if isOwner(userId);
       }
 
@@ -628,6 +642,75 @@ service cloud.firestore {
       allow delete: if isAuthenticated() &&
         request.auth.uid == resource.data.mohaffezId &&
         resource.data.status == 'cancelled';
+
+      // Student-visible prompts are embedded on the parent session document.
+      // Only the teacher may inspect the separately stored answer key.
+      match /challengePrivate/{setVersion} {
+        allow read: if isAuthenticated() &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId ==
+            request.auth.uid;
+        allow create, update, delete: if false;
+      }
+
+      // A single compact document synchronizes the live recitation-card game.
+      // Quran text and card payloads stay in local app assets; only round state
+      // is stored here to keep reads, writes, and bandwidth small.
+      match /liveGames/{gameId} {
+        allow get: if gameId == 'recitationCards' && isAuthenticated() && (
+          (resource != null && (
+            request.auth.uid == resource.data.studentId ||
+            request.auth.uid == resource.data.mohaffezId
+          )) ||
+          (resource == null && (
+            request.auth.uid ==
+              get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.studentId ||
+            request.auth.uid ==
+              get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId
+          ))
+        );
+        allow list: if false;
+
+        allow create: if gameId == 'recitationCards' &&
+          isAuthenticated() &&
+          request.auth.uid == request.resource.data.mohaffezId &&
+          request.resource.data.schemaVersion == 1 &&
+          request.resource.data.status == 'playing' &&
+          request.resource.data.cardCount in [4, 6, 8] &&
+          request.resource.data.scopes is list &&
+          request.resource.data.results is map &&
+          request.resource.data.selectedIndex == null &&
+          request.resource.data.expiresAt is timestamp &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.status ==
+            'accepted' &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId ==
+            request.resource.data.mohaffezId &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.studentId ==
+            request.resource.data.studentId;
+
+        allow update: if gameId == 'recitationCards' &&
+          isAuthenticated() &&
+          request.resource.data.mohaffezId == resource.data.mohaffezId &&
+          request.resource.data.studentId == resource.data.studentId &&
+          request.resource.data.studentProfileId == resource.data.studentProfileId &&
+          request.resource.data.schemaVersion == resource.data.schemaVersion &&
+          (
+            request.auth.uid == resource.data.mohaffezId ||
+            (
+              request.auth.uid == resource.data.studentId &&
+              resource.data.status == 'playing' &&
+              resource.data.selectedIndex == null &&
+              request.time < resource.data.expiresAt &&
+              onlyUpdating(['selectedIndex', 'selectedBy', 'updatedAt']) &&
+              request.resource.data.selectedIndex is int &&
+              request.resource.data.selectedIndex >= 0 &&
+              request.resource.data.selectedIndex < resource.data.cardCount &&
+              request.resource.data.selectedBy == request.auth.uid &&
+              request.resource.data.updatedAt == request.time
+            )
+          );
+
+        allow delete: if false;
+      }
     }
 
     // ============================================

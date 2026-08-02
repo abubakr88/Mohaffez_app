@@ -57,6 +57,22 @@ class _ConfigForm extends ConsumerWidget {
       tabletColumns: 1,
       desktopColumns: 2,
       children: [
+        _ConfigCard(
+          title: 'تحديات الجلسة V2',
+          children: [
+            _SwitchRow(
+              label: 'تفعيل التحديات منخفضة التكلفة',
+              value: config.challengeV2Enabled,
+              onChanged: (v) => _save(context, ref, {'challengeV2Enabled': v}),
+            ),
+            const SizedBox(height: DSSpacing.sm),
+            Text(
+              'يتحكم في البطاقة الدائمة للطالب ومعالج بنك الأسئلة الموحد.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+          ],
+        ),
+
         // ── Maintenance ─────────────────────────────────────────────────
         _ConfigCard(
           title: 'وضع الصيانة',
