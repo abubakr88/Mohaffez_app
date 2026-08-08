@@ -214,14 +214,15 @@ StudentLevel resolveLevel(int sessions, int age) {
 // ─── Providers ────────────────────────────────────────────────────────────────
 
 /// Real-time stream of memorized surah numbers (1-114) for a student.
-final memorizedSurahsProvider = StreamProvider.family<List<int>, String>(
+final memorizedSurahsProvider =
+    StreamProvider.autoDispose.family<List<int>, String>(
   (ref, studentId) {
     return _watchMemorizedSurahs(studentId: studentId);
   },
 );
 
-final learnerMemorizedSurahsProvider = StreamProvider.family<List<int>,
-    ({String studentId, String? studentProfileId})>(
+final learnerMemorizedSurahsProvider = StreamProvider.autoDispose
+    .family<List<int>, ({String studentId, String? studentProfileId})>(
   (ref, params) {
     return _watchMemorizedSurahs(
       studentId: params.studentId,

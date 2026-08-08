@@ -21,7 +21,8 @@ final filteredSubscriptionsProvider = StreamProvider.autoDispose
 
 /// Count only — used by the home bottom nav badge.
 /// autoDispose keeps it alive only while HomeShell is mounted (always).
-final activeSubscriptionCountProvider = StreamProvider.family<int, String>(
+final activeSubscriptionCountProvider =
+    StreamProvider.autoDispose.family<int, String>(
   (ref, studentId) => ref
       .read(subscriptionRepositoryProvider)
       .watchActiveSubscriptionCount(studentId),

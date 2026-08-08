@@ -82,6 +82,126 @@ service cloud.firestore {
                 minimumRate * plan.sessionsCount * plan.sessionDurationMinutes);
     }
 
+    function validTeachingServices(data) {
+      let value = data.get('teachingServices', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly([
+               'memorization', 'review', 'foundation', 'tajweed',
+               'recitation_correction', 'ijazah', 'qiraat'
+             ]) &&
+             value.get('memorization', false) is bool &&
+             value.get('review', false) is bool &&
+             value.get('foundation', false) is bool &&
+             value.get('tajweed', false) is bool &&
+             value.get('recitation_correction', false) is bool &&
+             value.get('ijazah', false) is bool &&
+             value.get('qiraat', false) is bool &&
+             (
+               value.get('memorization', false) == true ||
+               value.get('review', false) == true ||
+               value.get('foundation', false) == true ||
+               value.get('tajweed', false) == true ||
+               value.get('recitation_correction', false) == true ||
+               value.get('ijazah', false) == true ||
+               value.get('qiraat', false) == true
+             );
+    }
+
+    function validLearnerAgeGroups(data) {
+      let value = data.get('learnerAgeGroups', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['children', 'teens', 'adults']) &&
+             value.get('children', false) is bool &&
+             value.get('teens', false) is bool &&
+             value.get('adults', false) is bool &&
+             (
+               value.get('children', false) == true ||
+               value.get('teens', false) == true ||
+               value.get('adults', false) == true
+             );
+    }
+
+    function validLearnerGenders(data) {
+      let value = data.get('learnerGenders', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['male', 'female']) &&
+             value.get('male', false) is bool &&
+             value.get('female', false) is bool &&
+             (
+               value.get('male', false) == true ||
+               value.get('female', false) == true
+             );
+    }
+
+    function validAudienceGenderMap(value) {
+      return value is map &&
+             value.keys().hasOnly(['male', 'female']) &&
+             value.get('male', false) is bool &&
+             value.get('female', false) is bool;
+    }
+
+    function validLearnerAudiences(data) {
+      let value = data.get('learnerAudiences', {});
+      let children = value.get('children', {});
+      let teens = value.get('teens', {});
+      let adults = value.get('adults', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['children', 'teens', 'adults']) &&
+             validAudienceGenderMap(children) &&
+             validAudienceGenderMap(teens) &&
+             validAudienceGenderMap(adults) &&
+             (
+               children.get('male', false) == true ||
+               children.get('female', false) == true ||
+               teens.get('male', false) == true ||
+               teens.get('female', false) == true ||
+               adults.get('male', false) == true ||
+               adults.get('female', false) == true
+             );
+    }
+
+    function validLearnerLevels(data) {
+      let value = data.get('learnerLevels', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['beginner', 'intermediate', 'advanced']) &&
+             value.get('beginner', false) is bool &&
+             value.get('intermediate', false) is bool &&
+             value.get('advanced', false) is bool &&
+             (
+               value.get('beginner', false) == true ||
+               value.get('intermediate', false) == true ||
+               value.get('advanced', false) == true
+             );
+    }
+
+    function validTeachingLanguages(data) {
+      let value = data.get('teachingLanguages', {});
+      let primary = data.get('primaryTeachingLanguage', '');
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['ar', 'en', 'id', 'fr', 'tr', 'ur']) &&
+             value.get('ar', false) is bool &&
+             value.get('en', false) is bool &&
+             value.get('id', false) is bool &&
+             value.get('fr', false) is bool &&
+             value.get('tr', false) is bool &&
+             value.get('ur', false) is bool &&
+             primary in ['ar', 'en', 'id', 'fr', 'tr', 'ur'] &&
+             value.get(primary, false) == true;
+    }
+
+    function validTeacherDiscoveryProfile(data) {
+      return validTeachingServices(data) &&
+             validLearnerLevels(data) &&
+             validTeachingLanguages(data) &&
+             (
+               (data.get('discoveryProfileVersion', 0) == 2 &&
+                validLearnerAudiences(data)) ||
+               (data.get('discoveryProfileVersion', 0) == 1 &&
+                validLearnerAgeGroups(data) &&
+                validLearnerGenders(data))
+             );
+    }
+
     // Admin authority is granted exclusively via custom claims minted server-side
     // (Cloud Functions / Admin SDK). The previous Firestore-doc fallback is removed
     // so a self-set `role: 'admin'` field on /users/{uid} cannot grant admin powers.
@@ -209,13 +329,17 @@ service cloud.firestore {
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
             'addressLng', 'specialization', 'name', 'honorific',
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
             'acceptingNewBookings',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
-            'setupCompleted', 'dateOfBirth', 'city',
+            'setupCompleted', 'dateOfBirth', 'gender', 'city',
             'country', 'countryCode',
             'accountType', 'activeStudentProfileId',
             'examScore', 'examTakenAt',
@@ -269,6 +393,16 @@ service cloud.firestore {
               ]
             )
           )
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion'
+          ]) ||
+          (resource.data.role == 'mohaffez' &&
+           validTeacherDiscoveryProfile(request.resource.data))
         );
 
       // Mohaffez submitting for admin approval (registration step 3)
@@ -280,9 +414,14 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly([
             'bio', 'specialization', 'youtubeVideoUrl',
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion',
             'status', 'setupCompleted',
             'approvalSubmittedAt', 'updatedAt'
-          ]);
+          ]) &&
+        validTeacherDiscoveryProfile(request.resource.data);
 
       // Admin user-management writes are permission-scoped. Cloud Functions
       // still bypass rules via Admin SDK for privileged workflows.

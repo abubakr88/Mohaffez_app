@@ -8,6 +8,10 @@ class SystemConfigModel {
   final double minimumWithdrawAmount;
   final double minimumTeacherHourlyRateEgp;
   final int minimumIndependentStudentAge;
+  final int discoveryChildrenMaxAge;
+  final int discoveryTeenMaxAge;
+  final bool discoveryAudienceMatchingEnabled;
+  final bool allowIncompleteTeacherAudience;
   final int paymentDeadlineHours;
   final int promoCodeMaxDiscount;
   final bool freeSessionEnabled;
@@ -71,6 +75,10 @@ class SystemConfigModel {
     required this.minimumWithdrawAmount,
     required this.minimumTeacherHourlyRateEgp,
     required this.minimumIndependentStudentAge,
+    required this.discoveryChildrenMaxAge,
+    required this.discoveryTeenMaxAge,
+    required this.discoveryAudienceMatchingEnabled,
+    required this.allowIncompleteTeacherAudience,
     required this.paymentDeadlineHours,
     required this.promoCodeMaxDiscount,
     required this.freeSessionEnabled,
@@ -120,6 +128,15 @@ class SystemConfigModel {
     final data = (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
     final defaults = SystemConfigModel.defaults();
     final updatedAt = data['updatedAt'];
+    final configuredChildrenMaxAge =
+        (data['discoveryChildrenMaxAge'] as num?)?.toInt() ??
+            defaults.discoveryChildrenMaxAge;
+    final configuredTeenMaxAge =
+        (data['discoveryTeenMaxAge'] as num?)?.toInt() ??
+            defaults.discoveryTeenMaxAge;
+    final hasValidAudienceAges = configuredChildrenMaxAge >= 0 &&
+        configuredChildrenMaxAge < configuredTeenMaxAge &&
+        configuredTeenMaxAge <= 30;
     return SystemConfigModel(
       commissionRate: (data['commissionRate'] as num?)?.toDouble() ??
           defaults.commissionRate,
@@ -137,6 +154,18 @@ class SystemConfigModel {
                   defaults.minimumIndependentStudentAge)
               .clamp(5, 30)
               .toInt(),
+      discoveryChildrenMaxAge: hasValidAudienceAges
+          ? configuredChildrenMaxAge
+          : defaults.discoveryChildrenMaxAge,
+      discoveryTeenMaxAge: hasValidAudienceAges
+          ? configuredTeenMaxAge
+          : defaults.discoveryTeenMaxAge,
+      discoveryAudienceMatchingEnabled:
+          data['discoveryAudienceMatchingEnabled'] as bool? ??
+              defaults.discoveryAudienceMatchingEnabled,
+      allowIncompleteTeacherAudience:
+          data['allowIncompleteTeacherAudience'] as bool? ??
+              defaults.allowIncompleteTeacherAudience,
       paymentDeadlineHours: (data['paymentDeadlineHours'] as num?)?.toInt() ??
           defaults.paymentDeadlineHours,
       promoCodeMaxDiscount: (data['promoCodeMaxDiscount'] as num?)?.toInt() ??
@@ -245,6 +274,10 @@ class SystemConfigModel {
       minimumWithdrawAmount: 100.0,
       minimumTeacherHourlyRateEgp: 0.0,
       minimumIndependentStudentAge: 18,
+      discoveryChildrenMaxAge: 10,
+      discoveryTeenMaxAge: 15,
+      discoveryAudienceMatchingEnabled: true,
+      allowIncompleteTeacherAudience: true,
       paymentDeadlineHours: 48,
       promoCodeMaxDiscount: 100,
       freeSessionEnabled: true,
@@ -298,6 +331,10 @@ class SystemConfigModel {
       'minimumWithdrawAmount': minimumWithdrawAmount,
       'minimumTeacherHourlyRateEgp': minimumTeacherHourlyRateEgp,
       'minimumIndependentStudentAge': minimumIndependentStudentAge,
+      'discoveryChildrenMaxAge': discoveryChildrenMaxAge,
+      'discoveryTeenMaxAge': discoveryTeenMaxAge,
+      'discoveryAudienceMatchingEnabled': discoveryAudienceMatchingEnabled,
+      'allowIncompleteTeacherAudience': allowIncompleteTeacherAudience,
       'paymentDeadlineHours': paymentDeadlineHours,
       'promoCodeMaxDiscount': promoCodeMaxDiscount,
       'freeSessionEnabled': freeSessionEnabled,

@@ -22,6 +22,12 @@ const MATERIALIZED_TYPES = new Set([
   "open_question",
 ]);
 
+// Generated questions are materialized in the publish payload, so the server
+// still validates their Quran location and supported interaction mode. Keep
+// explicit compatibility with already-published v1 questions while accepting
+// the page-aware v2 generator used by the current clients.
+const SUPPORTED_QURAN_GENERATOR_VERSIONS = new Set([1, 2]);
+
 function boundedText(
   value: unknown,
   maxLength: number,
@@ -113,7 +119,9 @@ export function materializedChallengeQuestionsError(
     }
     if (source === "quran_generated") {
       if (
-        question.generatorVersion !== 1 ||
+        !SUPPORTED_QURAN_GENERATOR_VERSIONS.has(
+          question.generatorVersion as number,
+        ) ||
         !integerInRange(question.surahNumber, 1, 114) ||
         !integerInRange(question.anchorAyah, 1, 1000)
       ) {

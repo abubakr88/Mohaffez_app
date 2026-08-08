@@ -241,6 +241,54 @@ class _ConfigForm extends ConsumerWidget {
           ],
         ),
 
+        _ConfigCard(
+          title: 'مطابقة الطلاب بالمحفّظين',
+          children: [
+            _SwitchRow(
+              label: 'تفعيل المطابقة التلقائية للعمر والجنس',
+              value: config.discoveryAudienceMatchingEnabled,
+              onChanged: (v) => _save(
+                context,
+                ref,
+                {'discoveryAudienceMatchingEnabled': v},
+              ),
+            ),
+            const SizedBox(height: DSSpacing.sm),
+            _SwitchRow(
+              label: 'إظهار الملفات القديمة غير المكتملة مؤقتًا',
+              value: config.allowIncompleteTeacherAudience,
+              onChanged: (v) => _save(
+                context,
+                ref,
+                {'allowIncompleteTeacherAudience': v},
+              ),
+            ),
+            const SizedBox(height: DSSpacing.md),
+            _EditableRow(
+              label: 'حدود الفئات العمرية',
+              value: 'أطفال ≤ ${config.discoveryChildrenMaxAge}، '
+                  'مراهقون ≤ ${config.discoveryTeenMaxAge}',
+              onEdit: () => _editAudienceAges(
+                context,
+                childrenMaxAge: config.discoveryChildrenMaxAge,
+                teenMaxAge: config.discoveryTeenMaxAge,
+                onSave: (childrenMaxAge, teenMaxAge) => _save(
+                  context,
+                  ref,
+                  {
+                    'discoveryChildrenMaxAge': childrenMaxAge,
+                    'discoveryTeenMaxAge': teenMaxAge,
+                  },
+                ),
+              ),
+            ),
+            Text(
+              'الكبار يبدأون من السنة التالية لحد المراهقين. لا يضيف هذا الإعداد استعلامات بحث جديدة.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+          ],
+        ),
+
         // ── Sessions ────────────────────────────────────────────────────
         _ConfigCard(
           title: 'إعدادات الجلسات',
@@ -557,6 +605,66 @@ class _ConfigForm extends ConsumerWidget {
       return;
     }
     onSave(isInt ? parsed.roundToDouble() : parsed);
+  }
+
+  Future<void> _editAudienceAges(
+    BuildContext context, {
+    required int childrenMaxAge,
+    required int teenMaxAge,
+    required void Function(int childrenMaxAge, int teenMaxAge) onSave,
+  }) async {
+    final childrenController = TextEditingController(text: '$childrenMaxAge');
+    final teensController = TextEditingController(text: '$teenMaxAge');
+    final ok = await DSDialog.show<bool>(
+      context,
+      title: 'حدود الفئات العمرية',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DSTextField(
+            controller: childrenController,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            label: 'أقصى عمر للأطفال',
+          ),
+          const SizedBox(height: DSSpacing.md),
+          DSTextField(
+            controller: teensController,
+            keyboardType: TextInputType.number,
+            label: 'أقصى عمر للمراهقين',
+          ),
+        ],
+      ),
+      actions: [
+        DSButton(
+          label: 'إلغاء',
+          variant: DSButtonVariant.ghost,
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        DSButton(
+          label: 'حفظ',
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
+    );
+    if (ok != true) return;
+    final children = int.tryParse(childrenController.text.trim());
+    final teens = int.tryParse(teensController.text.trim());
+    if (children == null ||
+        teens == null ||
+        children < 0 ||
+        children >= teens ||
+        teens > 30) {
+      if (context.mounted) {
+        DSToast.show(
+          context,
+          'يجب أن يكون 0 ≤ حد الأطفال < حد المراهقين ≤ 30',
+          type: DSToastType.error,
+        );
+      }
+      return;
+    }
+    onSave(children, teens);
   }
 }
 

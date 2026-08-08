@@ -189,7 +189,7 @@ describe("session challenge policy", () => {
     ).toContain("correct option");
   });
 
-  it("requires generated Quran metadata and supported objective modes", () => {
+  it("accepts Quran generator v1 and v2 but rejects unknown versions", () => {
     const generated = Array.from({ length: 5 }, (_, index) => ({
       id: `qv1-s1-name-a${index + 1}`,
       type: "name_surah",
@@ -216,6 +216,17 @@ describe("session challenge policy", () => {
         {
           ...generated[4],
           generatorVersion: 2,
+          id: "qv2-s1-next-a5",
+          type: "complete_ayah",
+        },
+      ]),
+    ).toBeNull();
+    expect(
+      materializedChallengeQuestionsError([
+        ...generated.slice(0, 4),
+        {
+          ...generated[4],
+          generatorVersion: 3,
         },
       ]),
     ).toContain("Quran metadata");

@@ -6,6 +6,11 @@ import { EventStore } from '../services/EventStore';
 import { NotificationService } from '../services/NotificationService';
 import { PaymentOrchestrationService } from '../services/PaymentOrchestrationService';
 import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
+import {
+  buildRecentPendingPaymentsQuery,
+  PAYMOB_RECONCILIATION_SCHEDULE,
+  paymobReconciliationCutoffMillis,
+} from './reconciliationPolicy';
 
 interface ReconcilePaymentData {
   paymentId?: unknown;
@@ -298,27 +303,20 @@ export const reconcilePaymobPayment = paymobRuntime.https.onCall(
 );
 
 export const reconcilePendingPaymobPayments = paymobRuntime.pubsub
-  .schedule('every 1 minutes')
+  .schedule(PAYMOB_RECONCILIATION_SCHEDULE)
   .onRun(async () => {
-    const pending = await db
-      .collection('payments')
-      .where('status', '==', 'pending')
-      .limit(50)
-      .get();
+    // Paymob's webhook is the primary completion path. This scheduled fallback
+    // only needs recent payments and must filter them in Firestore; filtering
+    // after get() repeatedly billed every stale pending document.
+    const recentCutoff = admin.firestore.Timestamp.fromMillis(
+      paymobReconciliationCutoffMillis(),
+    );
+    const pending = await buildRecentPendingPaymentsQuery(
+      db.collection('payments'),
+      recentCutoff,
+    ).get();
 
-    const recentCutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const newestPending = pending.docs
-      .filter((document) => {
-        const createdAt = document.data()['createdAt'];
-        const createdAtMillis = createdAt?.toMillis?.() ?? 0;
-        return createdAtMillis >= recentCutoff;
-      })
-      .sort((left, right) => {
-        const leftTime = left.data()['createdAt']?.toMillis?.() ?? 0;
-        const rightTime = right.data()['createdAt']?.toMillis?.() ?? 0;
-        return rightTime - leftTime;
-      })
-      .slice(0, 10);
+    const newestPending = pending.docs;
 
     if (newestPending.length === 0) {
       functions.logger.info('Scheduled Paymob reconciliation finished', {

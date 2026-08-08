@@ -28,6 +28,7 @@ export 'src/models/subscription_model.dart';
 export 'src/models/suspension_model.dart';
 export 'src/models/system_config_model.dart';
 export 'src/models/teacher_badge.dart';
+export 'src/models/teacher_discovery.dart';
 export 'src/models/user_model.dart' hide TimestampConverter;
 export 'src/models/wallet_model.dart';
 export 'src/models/wallet_transaction_model.dart';

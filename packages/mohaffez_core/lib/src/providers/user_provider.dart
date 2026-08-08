@@ -57,7 +57,7 @@ final currentUserProvider = StreamProvider<UserModel?>((ref) {
 });
 
 final userByIdProvider =
-    StreamProvider.family<UserModel?, String>((ref, userId) {
+    StreamProvider.autoDispose.family<UserModel?, String>((ref, userId) {
   if (kDebugMode) debugPrint('userByIdProvider: $userId');
 
   return ref

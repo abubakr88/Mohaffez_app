@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,8 @@ class StudentProfilesScreen extends ConsumerWidget {
       data: (user) => user == null || normalizeRole(user.role) == roleParent,
       orElse: () => true,
     );
+    final showParentBackArrow =
+        normalizeRole(userAsync.valueOrNull?.role) == roleParent;
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -36,10 +39,13 @@ class StudentProfilesScreen extends ConsumerWidget {
           backgroundColor: _tealDark,
           foregroundColor: Colors.white,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_forward_rounded),
-            onPressed: () => context.pop(),
-          ),
+          automaticallyImplyLeading: false,
+          leading: showParentBackArrow
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  onPressed: () => context.pop(),
+                )
+              : null,
         ),
         body: userAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -123,7 +129,11 @@ class StudentProfilesScreen extends ConsumerWidget {
                                         }
                                       : null,
                                   onEdit: profile.id == 'self'
-                                      ? null
+                                      ? () => _showSelfProfileDialog(
+                                            context,
+                                            ref,
+                                            owner: user,
+                                          )
                                       : () => _showProfileDialog(
                                             context,
                                             ref,
@@ -395,7 +405,7 @@ class StudentProfilesScreen extends ConsumerWidget {
                         ),
                         child: Text(
                           birthDate == null
-                              ? 'اختياري'
+                              ? 'مطلوب للمطابقة مع المحفّظ المناسب'
                               : DateFormat('yyyy/MM/dd').format(birthDate!),
                           style: TextStyle(
                             color: birthDate == null ? _text3 : _text2,
@@ -417,7 +427,18 @@ class StudentProfilesScreen extends ConsumerWidget {
                       ? null
                       : () async {
                           final name = nameController.text.trim();
-                          if (name.isEmpty) return;
+                          if (name.isEmpty ||
+                              (gender != 'male' && gender != 'female') ||
+                              birthDate == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'أدخل الاسم وحدد النوع وتاريخ الميلاد',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
                           final repository =
                               ref.read(studentProfileRepositoryProvider);
                           final updated = (profile ??
@@ -492,6 +513,124 @@ class StudentProfilesScreen extends ConsumerWidget {
     );
 
     nameController.dispose();
+  }
+
+  static Future<void> _showSelfProfileDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    required UserModel owner,
+  }) async {
+    String? gender = owner.gender;
+    DateTime? birthDate = owner.dateOfBirth;
+    var isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('إكمال بيانات الطالب'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: gender,
+                  decoration: const InputDecoration(
+                    labelText: 'النوع',
+                    prefixIcon: Icon(Icons.wc_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'male', child: Text('طالب')),
+                    DropdownMenuItem(value: 'female', child: Text('طالبة')),
+                  ],
+                  onChanged: (value) => setState(() => gender = value),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: birthDate ?? DateTime(2010),
+                      firstDate: DateTime(1940),
+                      lastDate: DateTime.now(),
+                      helpText: 'تاريخ الميلاد',
+                    );
+                    if (picked != null) setState(() => birthDate = picked);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'تاريخ الميلاد',
+                      prefixIcon: Icon(Icons.cake_rounded),
+                    ),
+                    child: Text(
+                      birthDate == null
+                          ? 'اختر تاريخ الميلاد'
+                          : DateFormat('yyyy/MM/dd').format(birthDate!),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if ((gender != 'male' && gender != 'female') ||
+                            birthDate == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('حدد النوع وتاريخ الميلاد'),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => isSaving = true);
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(owner.uid)
+                              .update({
+                            'gender': gender,
+                            'dateOfBirth': Timestamp.fromDate(birthDate!),
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          });
+                          ref.invalidate(currentUserProvider);
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'تعذر حفظ البيانات. حاول مرة أخرى',
+                                ),
+                              ),
+                            );
+                          }
+                          setState(() => isSaving = false);
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('حفظ'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   static Future<String> _uploadStudentProfilePhoto({

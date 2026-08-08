@@ -10,6 +10,7 @@
     "ratings:v2": "npm run build && node lib/scripts/rebuildTeacherRatingsV2.js",
     "challenges:migrate:v2": "npm run build && node lib/scripts/migrateChallengeBanksV2.js",
     "challenges:measure:v2": "npm run build && node lib/scripts/measureChallengeV2Cost.js",
+    "teachers:migrate-discovery": "npm run build && node lib/scripts/migrateTeacherDiscoveryProfiles.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

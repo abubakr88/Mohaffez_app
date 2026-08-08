@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/widgets/cached_avatar.dart';
 import '../../shared/widgets/meeting_links_sheet.dart';
+import '../../shared/widgets/teacher_discovery_editor.dart';
 import '../../tour/tour_guard_helper.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -407,6 +408,130 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             : 'تعذّر حفظ رابط الفيديو. يرجى المحاولة مرة أخرى');
       }
     }
+  }
+
+  TeacherDiscoverySelection _teacherDiscoveryForUser(UserModel user) {
+    return TeacherDiscoverySelection.fromData({
+      'specialization': user.specialization,
+      'teachingServices': user.teachingServices,
+      'learnerAudiences': user.learnerAudiences,
+      'learnerAgeGroups': user.learnerAgeGroups,
+      'learnerGenders': user.learnerGenders,
+      'learnerLevels': user.learnerLevels,
+      'teachingLanguages': user.teachingLanguages,
+      'primaryTeachingLanguage': user.primaryTeachingLanguage,
+    });
+  }
+
+  Future<void> _showTeacherDiscoverySheet(UserModel user) async {
+    if (guardWriteInTour(ref, context)) return;
+    var selection = _teacherDiscoveryForUser(user);
+    var showValidation = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+            ),
+            decoration: const BoxDecoration(
+              color: AppThemeConstants.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                        const Spacer(),
+                        const Text(
+                          'بيانات التدريس والمطابقة',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      child: TeacherDiscoveryEditor(
+                        initialValue: selection,
+                        showValidationHint: showValidation,
+                        onChanged: (value) => selection = value,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                    decoration: const BoxDecoration(
+                      color: AppThemeConstants.surface,
+                      border: Border(top: BorderSide(color: _DS.border)),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final error = selection.validationMessage;
+                          if (error != null) {
+                            setSheetState(() => showValidation = true);
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
+                              SnackBar(content: Text(error)),
+                            );
+                            return;
+                          }
+                          try {
+                            await ref.read(userRepositoryProvider).updateUser(
+                                  user.uid,
+                                  selection.toFirestore(),
+                                );
+                            ref.invalidate(currentUserProvider);
+                            if (!sheetContext.mounted) return;
+                            Navigator.pop(sheetContext);
+                            if (mounted) {
+                              _showSnackBar(
+                                'تم حفظ بيانات التدريس والمطابقة',
+                                isSuccess: true,
+                              );
+                            }
+                          } catch (_) {
+                            if (sheetContext.mounted) {
+                              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'تعذّر حفظ البيانات. حاول مرة أخرى',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.save_rounded),
+                        label: const Text('حفظ البيانات'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _saveName(
@@ -837,30 +962,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 dateOfBirth: user.dateOfBirth),
                             const SizedBox(height: 12),
                             _StudentWalletCard(userId: user.uid),
-                            const SizedBox(height: 12),
-                            _SectionCard(
-                              title: 'إدارة الطلاب',
-                              icon: Icons.family_restroom_rounded,
-                              color: _DS.teal500,
-                              child: Column(
-                                children: [
-                                  _ActionTile(
-                                    icon: Icons.switch_account_rounded,
-                                    title: 'ملفات الطلاب',
-                                    subtitle:
-                                        'أضف أبناءك واختر الطالب النشط للحجز',
-                                    color: _DS.teal500,
-                                    isLast: true,
-                                    onTap: () =>
-                                        context.push('/student-profiles'),
-                                  ),
-                                ],
+                            if (normalizeRole(user.role) == roleParent) ...[
+                              const SizedBox(height: 12),
+                              _SectionCard(
+                                title: 'إدارة الطلاب',
+                                icon: Icons.family_restroom_rounded,
+                                color: _DS.teal500,
+                                child: Column(
+                                  children: [
+                                    _ActionTile(
+                                      icon: Icons.switch_account_rounded,
+                                      title: 'ملفات الطلاب',
+                                      subtitle:
+                                          'أضف أبناءك واختر الطالب النشط للحجز',
+                                      color: _DS.teal500,
+                                      isLast: true,
+                                      onTap: () =>
+                                          context.push('/student-profiles'),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                             const SizedBox(height: 12),
                           ],
 
                           if (isMohaffez) ...[
+                            if (user.discoveryProfileVersion < 2 ||
+                                !_teacherDiscoveryForUser(user).isComplete) ...[
+                              _SectionCard(
+                                title: 'أكمل بيانات المطابقة',
+                                icon: Icons.auto_awesome_rounded,
+                                color: _DS.amber,
+                                child: _ActionTile(
+                                  icon: Icons.manage_search_rounded,
+                                  title: user.discoveryProfileVersion < 2
+                                      ? 'أكد الفئات التي تدرّسها'
+                                      : 'حدد خدماتك وطلابك ولغاتك',
+                                  subtitle: user.discoveryProfileVersion < 2
+                                      ? 'حدد الجنس المناسب داخل كل فئة عمرية'
+                                      : 'ساعد الطلاب في الوصول إليك بسهولة أكبر',
+                                  color: _DS.amber,
+                                  isLast: true,
+                                  onTap: () => _showTeacherDiscoverySheet(user),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             _TeacherProfilePreviewCard(
                               onTap: () =>
                                   context.push('/teacher-profile-preview'),
@@ -940,6 +1088,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     subtitle: 'شهاداتك وتخصصاتك',
                                     color: _DS.purple,
                                     onTap: () => context.push('/credentials'),
+                                  ),
+                                  _ActionTile(
+                                    icon: Icons.manage_search_rounded,
+                                    title: 'بيانات التدريس والمطابقة',
+                                    subtitle:
+                                        'الخدمات والفئات والمستويات واللغات',
+                                    color: _DS.teal500,
+                                    onTap: () =>
+                                        _showTeacherDiscoverySheet(user),
                                   ),
                                   _ActionTile(
                                     icon: Icons.schedule_rounded,

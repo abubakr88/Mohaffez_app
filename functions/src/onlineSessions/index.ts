@@ -1,6 +1,12 @@
 import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import {
+  AUTO_END_BATCH_SIZE,
+  buildOnlineReminderQuery,
+  buildOverdueAcceptedSessionsQuery,
+  ONLINE_REMINDER_WINDOW_MS,
+} from './queryPolicy';
 
 type SessionDoc = Record<string, unknown>;
 
@@ -265,15 +271,14 @@ export const sendOnlineSessionReminder = functions.pubsub
     const nowMs = Date.now();
     const windowLower = admin.firestore.Timestamp.fromDate(new Date(nowMs));
     const windowUpper = admin.firestore.Timestamp.fromDate(
-      new Date(nowMs + 5 * 60 * 1000)
+      new Date(nowMs + ONLINE_REMINDER_WINDOW_MS)
     );
 
-    const snapshot = await db
-      .collection('hafizSessions')
-      .where('status', '==', 'accepted')
-      .where('sessionType', '==', 'online')
-      .where('meetingReminderSent', '==', false)
-      .get();
+    const snapshot = await buildOnlineReminderQuery(
+      db.collection('hafizSessions'),
+      windowLower,
+      windowUpper,
+    ).get();
 
     let sent = 0;
 
@@ -368,7 +373,6 @@ export const sendOnlineSessionReminder = functions.pubsub
  * since no rating was captured.
  */
 const DEFAULT_SESSION_MAX_DURATION_MIN = 90;
-const AUTO_END_BATCH_SIZE = 100;
 
 async function loadSessionMaxDurationMinutes(): Promise<number> {
   try {
@@ -391,44 +395,58 @@ export const autoEndOverdueSessions = functions
       Date.now() - maxMinutes * 60 * 1000,
     );
 
-    // We can't combine `status != completed` with `meetingStartedAt <= cutoff`
-    // in a single Firestore query (composite inequality not supported), so we
-    // query by `meetingStartedAt` and filter status in-memory. Sessions older
-    // than the cutoff that are already completed are simply skipped.
-    //
     // We deliberately do NOT filter `meetingEndedAt == null` in the query:
     // Firestore's `== null` only matches docs where the field exists AND is
     // null. The teacher-start flow never initializes `meetingEndedAt`, so
     // every in-progress session is missing the field and would be excluded.
     // Filter in-memory below instead.
-    const snap = await db
-      .collection('hafizSessions')
-      .where('meetingStartedAt', '<=', cutoff)
-      .orderBy('meetingStartedAt', 'asc')
-      .limit(AUTO_END_BATCH_SIZE)
-      .get();
+    // Meeting start does not change the booking status, so an active started
+    // session remains `accepted`. Filtering that equality on the server keeps
+    // completed historical sessions out of every scheduled scan and prevents
+    // them from occupying the bounded batch.
+    const snap = await buildOverdueAcceptedSessionsQuery(
+      db.collection('hafizSessions'),
+      cutoff,
+    ).get();
 
     let endedCount = 0;
     for (const doc of snap.docs) {
       const data = doc.data() as SessionDoc;
       if (data.meetingEndedAt) continue;
       const status = asString(data.status);
-      if (status === 'completed' || status === 'cancelled' || status === 'rejected') {
+      if (status !== 'accepted') {
         continue;
       }
       try {
-        await doc.ref.update({
-          status: 'completed',
-          completedAt: FieldValue.serverTimestamp(),
-          meetingEndedAt: FieldValue.serverTimestamp(),
-          autoCompleted: true,
-          autoCompletedReason: 'max_duration_exceeded',
-          autoCompletedMaxMinutes: maxMinutes,
-          updatedAt: FieldValue.serverTimestamp(),
+        let claimed = false;
+        let mohaffezId = '';
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(doc.ref);
+          if (!fresh.exists) return;
+
+          const freshData = fresh.data() as SessionDoc;
+          const freshStartedAt = freshData.meetingStartedAt;
+          if (asString(freshData.status) !== 'accepted') return;
+          if (freshData.meetingEndedAt) return;
+          if (!(freshStartedAt instanceof admin.firestore.Timestamp)) return;
+          if (freshStartedAt.toMillis() > cutoff.toMillis()) return;
+
+          mohaffezId = asString(freshData.mohaffezId);
+          transaction.update(doc.ref, {
+            status: 'completed',
+            completedAt: FieldValue.serverTimestamp(),
+            meetingEndedAt: FieldValue.serverTimestamp(),
+            autoCompleted: true,
+            autoCompletedReason: 'max_duration_exceeded',
+            autoCompletedMaxMinutes: maxMinutes,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          claimed = true;
         });
+        if (!claimed) continue;
+
         endedCount++;
 
-        const mohaffezId = asString(data.mohaffezId);
         if (mohaffezId) {
           await createAndSendNotification({
             userId: mohaffezId,

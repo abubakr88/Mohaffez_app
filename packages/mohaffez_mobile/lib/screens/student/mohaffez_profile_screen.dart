@@ -29,6 +29,60 @@ String _teacherNameFromProfile(
   return composeTeacherDisplayName(name, profile['honorific'] as String?);
 }
 
+class _TeachingFacetBlock extends StatelessWidget {
+  final String title;
+  final List<String> labels;
+
+  const _TeachingFacetBlock({required this.title, required this.labels});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppThemeConstants.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 7),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: labels
+              .map(
+                (label) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppThemeConstants.primary.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppThemeConstants.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+}
+
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final double? userLat;
@@ -784,6 +838,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           const SizedBox(height: 20),
                           _buildModernBioSection(profile['bio'] as String),
                         ],
+                        const SizedBox(height: 20),
+                        _buildTeachingProfileSection(
+                          ref,
+                          profile,
+                          publicCredentials: publicBundle?.credentials,
+                        ),
                         const SizedBox(height: 20),
                         _buildCredentialsSection(
                           ref,
@@ -2271,6 +2331,166 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 color: Colors.black87,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeachingProfileSection(
+    WidgetRef ref,
+    Map<String, dynamic> profile, {
+    List<Map<String, dynamic>>? publicCredentials,
+  }) {
+    final selection = TeacherDiscoverySelection.fromData(profile);
+    final hasStructuredData = selection.services.isNotEmpty ||
+        selection.ageGroups.isNotEmpty ||
+        selection.learnerGenders.isNotEmpty ||
+        selection.levels.isNotEmpty ||
+        selection.languages.isNotEmpty;
+    if (!hasStructuredData) return const SizedBox.shrink();
+
+    final credentials = publicCredentials ??
+        ref.watch(credentialsProvider(widget.mohaffezId)).valueOrNull ??
+        const <Map<String, dynamic>>[];
+    final hasVerifiedIjazah = credentials.any((credential) {
+      final type = credential['type']?.toString().trim().toLowerCase();
+      final status = credential['status']?.toString().trim().toLowerCase();
+      return type == 'ijazah' &&
+          (publicCredentials != null || status == null || status == 'approved');
+    });
+
+    List<String> labels(
+      Iterable<String> ids,
+      List<TeacherDiscoveryOption> options,
+    ) {
+      return ids
+          .map((id) => TeacherDiscoveryTaxonomy.label(options, id))
+          .toList(growable: false);
+    }
+
+    String audienceGenderLabel(String ageGroup, String gender) {
+      return switch ((ageGroup, gender)) {
+        ('children', 'male') => 'بنين',
+        ('children', 'female') => 'بنات',
+        ('teens', 'male') => 'فتيان',
+        ('teens', 'female') => 'فتيات',
+        ('adults', 'male') => 'رجال',
+        ('adults', 'female') => 'نساء',
+        (_, 'male') => 'ذكور',
+        _ => 'إناث',
+      };
+    }
+
+    final audienceLabels = <String>[
+      for (final ageGroup in TeacherDiscoveryTaxonomy.ageGroups)
+        if (selection.learnerAudiences[ageGroup.id] case final genders?
+            when genders.values.any((enabled) => enabled))
+          '${ageGroup.labelAr}: ${[
+            for (final gender in TeacherDiscoveryTaxonomy.learnerGenders)
+              if (genders[gender.id] == true)
+                audienceGenderLabel(ageGroup.id, gender.id),
+          ].join(' و')}',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.manage_search_rounded,
+                  color: AppThemeConstants.primary,
+                ),
+                SizedBox(width: 9),
+                Text(
+                  'التدريس والطلاب واللغات',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            if (selection.services.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _TeachingFacetBlock(
+                title: 'الخدمات',
+                labels: labels(
+                  selection.services,
+                  TeacherDiscoveryTaxonomy.services,
+                ),
+              ),
+            ],
+            if (audienceLabels.isNotEmpty) ...[
+              const SizedBox(height: 13),
+              _TeachingFacetBlock(
+                title: 'الفئات التي يدرّسها',
+                labels: audienceLabels,
+              ),
+            ],
+            if (selection.levels.isNotEmpty) ...[
+              const SizedBox(height: 13),
+              _TeachingFacetBlock(
+                title: 'المستويات',
+                labels: labels(
+                  selection.levels,
+                  TeacherDiscoveryTaxonomy.levels,
+                ),
+              ),
+            ],
+            if (selection.languages.isNotEmpty) ...[
+              const SizedBox(height: 13),
+              _TeachingFacetBlock(
+                title: 'لغات التدريس',
+                labels: labels(
+                  selection.languages,
+                  TeacherDiscoveryTaxonomy.languages,
+                ),
+              ),
+            ],
+            if (selection.services.contains('ijazah')) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    hasVerifiedIjazah
+                        ? Icons.verified_rounded
+                        : Icons.info_outline_rounded,
+                    size: 18,
+                    color: hasVerifiedIjazah
+                        ? AppThemeConstants.success
+                        : AppThemeConstants.textSecondary,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    hasVerifiedIjazah
+                        ? 'إجازة موثقة من إدارة المنصة'
+                        : 'خدمة الإجازة مضافة، دون وثيقة إجازة معتمدة بعد',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: hasVerifiedIjazah
+                          ? AppThemeConstants.success
+                          : AppThemeConstants.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

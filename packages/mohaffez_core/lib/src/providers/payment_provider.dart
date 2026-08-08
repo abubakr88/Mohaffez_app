@@ -8,20 +8,20 @@ import '../models/subscription_model.dart';
 import '../repositories/payment_repository.dart';
 import '../utils/pricing_country_utils.dart';
 
-final studentSubscriptionsProvider =
-    StreamProvider.family<List<SubscriptionModel>, String>((ref, studentId) {
+final studentSubscriptionsProvider = StreamProvider.autoDispose
+    .family<List<SubscriptionModel>, String>((ref, studentId) {
   final repository = ref.watch(paymentRepositoryProvider);
   return repository.watchStudentSubscriptions(studentId);
 });
 
-final studentPaymentsProvider =
-    StreamProvider.family<List<PaymentModel>, String>((ref, studentId) {
+final studentPaymentsProvider = StreamProvider.autoDispose
+    .family<List<PaymentModel>, String>((ref, studentId) {
   final repository = ref.watch(paymentRepositoryProvider);
   return repository.watchStudentPayments(studentId);
 });
 
 final paymentStatusProvider =
-    StreamProvider.family<PaymentModel?, String>((ref, paymentId) {
+    StreamProvider.autoDispose.family<PaymentModel?, String>((ref, paymentId) {
   final repository = ref.watch(paymentRepositoryProvider);
   return repository.watchPaymentStatus(paymentId);
 });

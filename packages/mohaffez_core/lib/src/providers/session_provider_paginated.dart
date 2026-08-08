@@ -87,7 +87,7 @@ final acceptedSessionsCountProvider = FutureProvider.family<int, String>(
 );
 
 final acceptedStudentSessionsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, studentId) {
     return FirebaseFirestore.instance
         .collection('hafizSessions')
@@ -311,7 +311,7 @@ final filteredUpcomingSessionsProvider =
 // COMPLETED SESSIONS - Stream (Real-time)
 // ============================================================================
 final completedSessionsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('hafizSessions')

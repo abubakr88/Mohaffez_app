@@ -128,7 +128,7 @@ final meetingInfoProvider =
   });
 });
 
-final _meetingClockProvider = StreamProvider<DateTime>((ref) {
+final _meetingClockProvider = StreamProvider.autoDispose<DateTime>((ref) {
   return Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now());
 });
 

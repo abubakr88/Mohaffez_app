@@ -34,10 +34,15 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
   int? quizBestStreak;
   int? quizAccuracyPct;
 
+  // The route receives a SessionModel snapshot. Keep the submitted rating in
+  // local state so this screen does not keep offering a second rating.
+  int _teacherRating = 0;
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
+    _teacherRating = widget.session.teacherRating;
     loadQuranMistakes(); // fire-and-forget — fine in initState
   }
 
@@ -59,6 +64,15 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
       final data = doc.data();
       if (data != null) {
+        // This document is already read for mistakes and quiz results, so
+        // synchronizing the rating here does not add a Firebase read.
+        final liveTeacherRating = (data['teacherRating'] as num?)?.toInt() ?? 0;
+        if (liveTeacherRating > 0 &&
+            liveTeacherRating != _teacherRating &&
+            mounted) {
+          setState(() => _teacherRating = liveTeacherRating);
+        }
+
         // ── Quiz results ────────────────────────────────────────────────────
         final qAsked = data['quizAsked'] as int?;
         if (qAsked != null && qAsked > 0 && mounted) {
@@ -482,8 +496,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       ),
     );
 
-    if (result != null && mounted) {
-      setState(() {});
+    if (result != null && result > 0 && mounted) {
+      setState(() => _teacherRating = result);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('شكراً على تقييمك!'),
@@ -814,6 +828,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
           isMohaffez: isMohaffez,
           isStudent: isStudent,
           session: session,
+          teacherRating: _teacherRating,
         ),
       ),
     );
@@ -1087,6 +1102,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     required bool isMohaffez,
     required bool isStudent,
     required SessionModel session,
+    required int teacherRating,
   }) {
     // Mohaffez: complete session button
     if (isMohaffez && session.status == 'accepted') {
@@ -1219,9 +1235,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       );
     }
 
-    if (isStudent &&
-        session.status == 'completed' &&
-        session.teacherRating == 0) {
+    if (isStudent && session.status == 'completed' && teacherRating == 0) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
