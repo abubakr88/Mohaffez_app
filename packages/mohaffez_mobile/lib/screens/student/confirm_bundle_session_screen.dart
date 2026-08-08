@@ -24,8 +24,13 @@ import '../../shared/widgets/meeting_provider_picker.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;
+  final String? subscriptionId;
 
-  const ConfirmBundleSessionScreen({super.key, this.requestId});
+  const ConfirmBundleSessionScreen({
+    super.key,
+    this.requestId,
+    this.subscriptionId,
+  });
 
   @override
   ConsumerState<ConfirmBundleSessionScreen> createState() =>
@@ -37,7 +42,7 @@ class _ConfirmBundleSessionScreenState
   bool _isLoading = false;
   String? _selectedProvider;
   bool _showProviderValidation = false;
-  ActiveBundleInfo? _activeSubscription;
+  SubscriptionModel? _activeSubscription;
   bool _loadingSubscription = true;
   String? _subscriptionError;
   SessionRequestModel? _loadedRequest;
@@ -94,6 +99,12 @@ class _ConfirmBundleSessionScreenState
 
       // 5. Parse into model
       _loadedRequest = SessionRequestModel.fromMap(doc.data()!, doc.id);
+      final requestSubscriptionId = _loadedRequest!.subscriptionId?.trim();
+      if (requestSubscriptionId != null && requestSubscriptionId.isNotEmpty) {
+        ref
+            .read(bookingFlowProvider.notifier)
+            .setSelectedSubscription(requestSubscriptionId);
+      }
 
       // 6. Rebuild a SlotContext from the persisted fields
       final r = _loadedRequest!;
@@ -145,23 +156,62 @@ class _ConfirmBundleSessionScreenState
 
     try {
       final repo = ref.read(sessionRepositoryProvider);
-
-      // FIX Bug 1: pass sessionType so the correct subscription is returned
-      // when the student has multiple active bundles (e.g. online + home).
-      // NOTE: also update SessionRepository.getActiveBundle to accept and
-      // filter by sessionType in the Firestore query:
-      //   .where('sessionType', isEqualTo: sessionType)
-      final sub = await repo.getActiveBundle(
-        studentId: currentUser.uid,
-        mohaffezId: slotContext.mohaffezId,
-        sessionType: slotContext.sessionType, // FIX Bug 1
-      );
+      final exactSubscriptionId =
+          widget.subscriptionId?.trim().isNotEmpty == true
+              ? widget.subscriptionId!.trim()
+              : (_loadedRequest?.subscriptionId?.trim().isNotEmpty == true
+                  ? _loadedRequest!.subscriptionId!.trim()
+                  : flow.selectedSubscriptionId?.trim());
+      SubscriptionModel? sub;
+      if (exactSubscriptionId != null && exactSubscriptionId.isNotEmpty) {
+        sub = await repo.getBundleById(exactSubscriptionId);
+      } else {
+        // Compatibility for old internal links created before exact bundle IDs
+        // were carried through the booking flow.
+        final legacy = await repo.getActiveBundle(
+          studentId: currentUser.uid,
+          mohaffezId: slotContext.mohaffezId,
+          sessionType: slotContext.sessionType,
+        );
+        if (legacy != null) sub = await repo.getBundleById(legacy.id);
+      }
 
       if (!mounted) return;
 
       if (sub == null) {
         setState(() {
           _subscriptionError = 'لا توجد باقة نشطة لهذا النوع من الجلسات';
+          _loadingSubscription = false;
+        });
+        return;
+      }
+
+      if (sub.studentId != currentUser.uid ||
+          sub.mohaffezId != slotContext.mohaffezId ||
+          (sub.sessionType.trim().isNotEmpty &&
+              sub.sessionType != slotContext.sessionType)) {
+        setState(() {
+          _subscriptionError = 'الباقة المختارة لا تخص هذا الحجز.';
+          _loadingSubscription = false;
+        });
+        return;
+      }
+
+      if (!sub.canBookSession) {
+        setState(() {
+          _subscriptionError =
+              'هذه الباقة غير نشطة أو منتهية أو لا تحتوي على جلسات متبقية.';
+          _loadingSubscription = false;
+        });
+        return;
+      }
+
+      if (normalizeRole(currentUser.role) == roleParent &&
+          ((sub.studentProfileId?.trim().isEmpty ?? true) ||
+              (sub.studentProfileName?.trim().isEmpty ?? true))) {
+        setState(() {
+          _subscriptionError =
+              'لا تحتوي هذه الباقة على بيانات الابن المرتبط بها. تواصل مع الدعم قبل الحجز.';
           _loadingSubscription = false;
         });
         return;
@@ -235,7 +285,22 @@ class _ConfirmBundleSessionScreenState
       return;
     }
 
-    final activeProfile = resolveBookingLearner(context, ref, currentUser);
+    final storedProfileId = sub.studentProfileId?.trim();
+    final storedProfileName = sub.studentProfileName?.trim();
+    final activeProfile = storedProfileId != null &&
+            storedProfileId.isNotEmpty &&
+            storedProfileName != null &&
+            storedProfileName.isNotEmpty
+        ? StudentProfileModel(
+            id: storedProfileId,
+            ownerId: currentUser.uid,
+            name: storedProfileName,
+            gender: sub.studentProfileGender,
+            dateOfBirth: sub.studentProfileBirthDate,
+            photoUrl: sub.studentProfilePhotoUrl,
+            relationship: 'child',
+          )
+        : resolveBookingLearner(context, ref, currentUser);
     if (activeProfile == null) return;
 
     setState(() => _isLoading = true);
@@ -304,7 +369,7 @@ class _ConfirmBundleSessionScreenState
         imamAddressLng: slotContext.imamAddressLng,
         mohaffezPhone: slotContext.mohaffezPhone,
         studentPhone: currentUser.phoneNumber,
-        subscriptionId: sub.id,
+        subscriptionId: sub.id!,
         slotLockId: slotLockId, // Use the newly created slot lock
         // INTENTIONALLY false: no new payment needed — student already owns
         // this bundle. PendingRequestsScreen.handleAccept() detects
@@ -318,8 +383,12 @@ class _ConfirmBundleSessionScreenState
         paymentAmount: 0,
         preferredProvider:
             slotContext.sessionType == 'online' ? _selectedProvider : null,
-        guardianId: currentUser.uid,
-        guardianName: currentUser.name,
+        guardianId: sub.guardianId?.trim().isNotEmpty == true
+            ? sub.guardianId
+            : currentUser.uid,
+        guardianName: sub.guardianName?.trim().isNotEmpty == true
+            ? sub.guardianName
+            : currentUser.name,
         studentProfileId: activeProfile.id,
         studentProfileName: activeProfile.name,
         studentProfileGender: activeProfile.gender,

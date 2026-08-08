@@ -101,7 +101,7 @@ class _LoadingGrid extends StatelessWidget {
   }
 }
 
-class _MetricsView extends StatelessWidget {
+class _MetricsView extends ConsumerWidget {
   final AdminMetrics metrics;
   final AdminInsights insights;
   final bool insightsLoading;
@@ -115,12 +115,21 @@ class _MetricsView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final r = metrics.revenue;
     final c = metrics.commissions;
     final s = metrics.sessions;
     final u = metrics.users;
     final hasData = metrics.generatedAt != null;
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final canOpenUsers = access.isSuperAdmin ||
+        access.can(AdminPermission.manageUsers) ||
+        access.can(AdminPermission.manageUserRoles) ||
+        access.can(AdminPermission.deleteUsers);
+    final canOpenFinance = access.can(AdminPermission.manageFinance);
+    final canOpenSessions =
+        access.can(AdminPermission.manageUsers) || canOpenFinance;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,14 +149,8 @@ class _MetricsView extends StatelessWidget {
         ],
         _ActionQueuesSection(metrics: metrics),
         const SizedBox(height: DSSpacing.xxl),
-        _AdminInsightsSection(
-          insights: insights,
-          loading: insightsLoading,
-          hasError: insightsError,
-        ),
-        const SizedBox(height: DSSpacing.xxl),
-
-        // Top KPIs ─────────────────────────────────────────────────────────
+        const SectionHeader(title: 'ملخص الأداء'),
+        const SizedBox(height: DSSpacing.md),
         DSGrid(
           mobileColumns: 1,
           tabletColumns: 2,
@@ -160,87 +163,27 @@ class _MetricsView extends StatelessWidget {
               trendPositive: r.thisMonth >= r.lastMonth,
               icon: Icons.trending_up_rounded,
               iconColor: DSColors.success,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
             ),
             DSStatCard(
-              label: 'إيرادات السنة',
-              value: _money(r.ytd),
-              icon: Icons.calendar_today_rounded,
-              iconColor: DSColors.primary,
-            ),
-            DSStatCard(
-              label: 'مستحقات معلقة',
-              value: _money(c.outstanding),
-              trend: c.overdue > 0
-                  ? 'متأخرة: ${_money(c.overdue)}'
-                  : 'لا توجد متأخرات',
-              trendPositive: c.overdue == 0,
-              icon: Icons.payments_outlined,
-              iconColor: c.overdue > 0 ? DSColors.error : DSColors.warning,
-            ),
-            DSStatCard(
-              label: 'بانتظار التأكيد',
-              value: _money(c.pendingVerification),
-              trend: 'إيداعات محفظين تحتاج مراجعة',
-              icon: Icons.fact_check_outlined,
-              iconColor: DSColors.secondary,
-            ),
-          ],
-        ),
-        const SizedBox(height: DSSpacing.xxl),
-
-        // Revenue chart + commission state ────────────────────────────────
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 900;
-            if (!wide) {
-              return Column(
-                children: [
-                  _RevenueChartCard(months: r.last12Months),
-                  const SizedBox(height: DSSpacing.md),
-                  _CommissionsCard(commissions: c),
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: _RevenueChartCard(months: r.last12Months),
-                ),
-                const SizedBox(width: DSSpacing.md),
-                Expanded(child: _CommissionsCard(commissions: c)),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: DSSpacing.xxl),
-
-        // Sessions + users ────────────────────────────────────────────────
-        DSGrid(
-          mobileColumns: 1,
-          tabletColumns: 2,
-          desktopColumns: 4,
-          children: [
-            DSStatCard(
-              label: 'جلسات منجزة (الشهر)',
+              label: 'جلسات منجزة هذا الشهر',
               value: '${s.completedThisMonth}',
               trend: _intDelta(s.completedThisMonth, s.completedLastMonth),
               trendPositive: s.completedThisMonth >= s.completedLastMonth,
               icon: Icons.event_available_rounded,
               iconColor: DSColors.success,
+              onTap: canOpenSessions
+                  ? () => context.go('/admin/sessions?status=completed')
+                  : null,
             ),
             DSStatCard(
-              label: 'جلسات قيد الإنتظار',
+              label: 'جلسات قيد الانتظار',
               value: '${s.pendingNow}',
               icon: Icons.hourglass_empty_rounded,
-              iconColor: DSColors.warning,
-            ),
-            DSStatCard(
-              label: 'محفظون نشطون (٣٠ يوم)',
-              value: '${u.activeTeachers30d} / ${u.totalTeachers}',
-              icon: Icons.school_outlined,
-              iconColor: DSColors.primary,
+              iconColor: s.pendingNow > 0 ? DSColors.warning : DSColors.success,
+              onTap: canOpenSessions
+                  ? () => context.go('/admin/sessions?status=pending')
+                  : null,
             ),
             DSStatCard(
               label: 'تسجيلات جديدة هذا الشهر',
@@ -251,8 +194,47 @@ class _MetricsView extends StatelessWidget {
               trendPositive: u.pendingTeacherApprovals == 0,
               icon: Icons.person_add_alt_1_rounded,
               iconColor: DSColors.secondary,
+              onTap: canOpenUsers ? () => context.go('/admin/users') : null,
             ),
           ],
+        ),
+        const SizedBox(height: DSSpacing.xxl),
+        const SectionHeader(title: 'التفاصيل والتحليلات'),
+        const SizedBox(height: DSSpacing.md),
+        _DashboardSection(
+          title: 'النمو والصحة التشغيلية',
+          subtitle: 'مسار التحويل والتنبيهات والمدفوعات التي تحتاج متابعة',
+          icon: Icons.monitor_heart_outlined,
+          child: _AdminInsightsSection(
+            insights: insights,
+            loading: insightsLoading,
+            hasError: insightsError,
+            canOpenFinance: canOpenFinance,
+            canOpenSessions: canOpenSessions,
+          ),
+        ),
+        const SizedBox(height: DSSpacing.md),
+        _DashboardSection(
+          title: 'الإيرادات والعمولات',
+          subtitle: 'الاتجاهات المالية وحالة المستحقات خلال الفترات الأخيرة',
+          icon: Icons.account_balance_outlined,
+          child: _FinancialDetails(
+            revenue: r,
+            commissions: c,
+            canOpenFinance: canOpenFinance,
+          ),
+        ),
+        const SizedBox(height: DSSpacing.md),
+        _DashboardSection(
+          title: 'الجلسات والمستخدمون',
+          subtitle: 'الإلغاءات ونشاط المحفظين وإجمالي قاعدة المستخدمين',
+          icon: Icons.groups_2_outlined,
+          child: _SessionsUsersDetails(
+            sessions: s,
+            users: u,
+            canOpenSessions: canOpenSessions,
+            canOpenUsers: canOpenUsers,
+          ),
         ),
       ],
     );
@@ -276,16 +258,233 @@ class _MetricsView extends StatelessWidget {
   }
 }
 
+class _DashboardSection extends StatelessWidget {
+  const _DashboardSection({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: DSSpacing.xl,
+            vertical: DSSpacing.sm,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            DSSpacing.xl,
+            0,
+            DSSpacing.xl,
+            DSSpacing.xl,
+          ),
+          leading: Container(
+            padding: const EdgeInsets.all(DSSpacing.sm),
+            decoration: BoxDecoration(
+              color: DSColors.primary.withValues(alpha: 0.1),
+              borderRadius: DSRadius.mdAll,
+            ),
+            child: Icon(icon, size: 20, color: DSColors.primary),
+          ),
+          title: Text(title, style: DSText.bodyMedium(context)),
+          subtitle: Text(
+            subtitle,
+            style: DSText.caption(context, color: DSColors.text3),
+          ),
+          children: [
+            const Divider(height: 1, color: DSColors.border),
+            const SizedBox(height: DSSpacing.xl),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FinancialDetails extends StatelessWidget {
+  const _FinancialDetails({
+    required this.revenue,
+    required this.commissions,
+    required this.canOpenFinance,
+  });
+
+  final RevenueMetrics revenue;
+  final CommissionMetrics commissions;
+  final bool canOpenFinance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 4,
+          children: [
+            DSStatCard(
+              label: 'إيرادات السنة',
+              value: _money(revenue.ytd),
+              icon: Icons.calendar_today_rounded,
+              iconColor: DSColors.primary,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
+            ),
+            DSStatCard(
+              label: 'مستحقات معلقة',
+              value: _money(commissions.outstanding),
+              trend: commissions.overdue > 0
+                  ? 'متأخرة: ${_money(commissions.overdue)}'
+                  : 'لا توجد متأخرات',
+              trendPositive: commissions.overdue == 0,
+              icon: Icons.payments_outlined,
+              iconColor:
+                  commissions.overdue > 0 ? DSColors.error : DSColors.warning,
+              onTap: canOpenFinance
+                  ? () => context.go('/admin/payments?status=pending')
+                  : null,
+            ),
+            DSStatCard(
+              label: 'بانتظار التأكيد',
+              value: _money(commissions.pendingVerification),
+              icon: Icons.fact_check_outlined,
+              iconColor: DSColors.secondary,
+              onTap: canOpenFinance
+                  ? () => context.go('/admin/payments?status=pending')
+                  : null,
+            ),
+            DSStatCard(
+              label: 'مدفوع هذا الشهر',
+              value: _money(commissions.paidThisMonth),
+              icon: Icons.task_alt_rounded,
+              iconColor: DSColors.success,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.xxl),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 900;
+            if (!wide) {
+              return Column(
+                children: [
+                  _RevenueChartCard(months: revenue.last12Months),
+                  const SizedBox(height: DSSpacing.md),
+                  _CommissionsCard(commissions: commissions),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _RevenueChartCard(months: revenue.last12Months),
+                ),
+                const SizedBox(width: DSSpacing.md),
+                Expanded(
+                  child: _CommissionsCard(commissions: commissions),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  static String _money(double value) =>
+      '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
+}
+
+class _SessionsUsersDetails extends StatelessWidget {
+  const _SessionsUsersDetails({
+    required this.sessions,
+    required this.users,
+    required this.canOpenSessions,
+    required this.canOpenUsers,
+  });
+
+  final SessionMetrics sessions;
+  final UserMetrics users;
+  final bool canOpenSessions;
+  final bool canOpenUsers;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSGrid(
+      mobileColumns: 1,
+      tabletColumns: 2,
+      desktopColumns: 4,
+      children: [
+        DSStatCard(
+          label: 'جلسات ملغاة هذا الشهر',
+          value: '${sessions.cancelledThisMonth}',
+          icon: Icons.event_busy_rounded,
+          iconColor: sessions.cancelledThisMonth > 0
+              ? DSColors.error
+              : DSColors.success,
+          onTap: canOpenSessions
+              ? () => context.go('/admin/sessions?status=cancelled')
+              : null,
+        ),
+        DSStatCard(
+          label: 'محفظون نشطون خلال ٣٠ يومًا',
+          value: '${users.activeTeachers30d} / ${users.totalTeachers}',
+          icon: Icons.school_outlined,
+          iconColor: DSColors.primary,
+          onTap: canOpenUsers
+              ? () => context.go('/admin/users?role=mohaffez')
+              : null,
+        ),
+        DSStatCard(
+          label: 'إجمالي المحفظين',
+          value: '${users.totalTeachers}',
+          icon: Icons.co_present_outlined,
+          iconColor: DSColors.secondary,
+          onTap: canOpenUsers
+              ? () => context.go('/admin/users?role=mohaffez')
+              : null,
+        ),
+        DSStatCard(
+          label: 'إجمالي الطلاب',
+          value: '${users.totalStudents}',
+          icon: Icons.groups_outlined,
+          iconColor: DSColors.primary,
+          onTap: canOpenUsers
+              ? () => context.go('/admin/users?role=student')
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
 class _AdminInsightsSection extends StatelessWidget {
   const _AdminInsightsSection({
     required this.insights,
     required this.loading,
     required this.hasError,
+    required this.canOpenFinance,
+    required this.canOpenSessions,
   });
 
   final AdminInsights insights;
   final bool loading;
   final bool hasError;
+  final bool canOpenFinance;
+  final bool canOpenSessions;
 
   @override
   Widget build(BuildContext context) {
@@ -338,6 +537,7 @@ class _AdminInsightsSection extends StatelessWidget {
               trend: '${growth.signups} تسجيل جديد',
               icon: Icons.send_outlined,
               iconColor: DSColors.primary,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
             ),
             DSStatCard(
               label: 'طلبات مقبولة',
@@ -346,6 +546,7 @@ class _AdminInsightsSection extends StatelessWidget {
               trendPositive: growth.requestAcceptanceRate >= 0.5,
               icon: Icons.task_alt_rounded,
               iconColor: DSColors.success,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
             ),
             DSStatCard(
               label: 'دفعات مكتملة',
@@ -354,6 +555,9 @@ class _AdminInsightsSection extends StatelessWidget {
               trendPositive: growth.paymentConversionRate >= 0.5,
               icon: Icons.credit_card_rounded,
               iconColor: DSColors.secondary,
+              onTap: canOpenFinance
+                  ? () => context.go('/admin/payments?status=completed')
+                  : null,
             ),
             DSStatCard(
               label: 'جلسات مكتملة',
@@ -362,6 +566,9 @@ class _AdminInsightsSection extends StatelessWidget {
               trendPositive: growth.sessionCompletionRate >= 0.7,
               icon: Icons.event_available_outlined,
               iconColor: DSColors.success,
+              onTap: canOpenSessions
+                  ? () => context.go('/admin/sessions?status=completed')
+                  : null,
             ),
           ],
         ),
@@ -385,6 +592,11 @@ class _AdminInsightsSection extends StatelessWidget {
               iconColor: operations.failedOperations > 0
                   ? DSColors.error
                   : DSColors.success,
+              onTap: canOpenFinance
+                  ? () => context.go(
+                        '/admin/payment-events?type=payment_failed',
+                      )
+                  : null,
             ),
             DSStatCard(
               label: 'مدفوعات معلقة',
@@ -396,6 +608,9 @@ class _AdminInsightsSection extends StatelessWidget {
                   operations.pendingDirectPayments == 0,
               icon: Icons.hourglass_top_rounded,
               iconColor: DSColors.warning,
+              onTap: canOpenFinance
+                  ? () => context.go('/admin/payments?status=pending')
+                  : null,
             ),
             DSStatCard(
               label: 'صافي المدفوعات المرصودة',
@@ -406,6 +621,7 @@ class _AdminInsightsSection extends StatelessWidget {
               trendPositive: finance.refundedAmountEgp == 0,
               icon: Icons.account_balance_outlined,
               iconColor: DSColors.primary,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
             ),
             DSStatCard(
               label: 'عمولة المنصة المرصودة',
@@ -416,6 +632,7 @@ class _AdminInsightsSection extends StatelessWidget {
               trendPositive: finance.commissionReversedEgp == 0,
               icon: Icons.percent_rounded,
               iconColor: DSColors.secondary,
+              onTap: canOpenFinance ? () => context.go('/admin/reports') : null,
             ),
           ],
         ),
@@ -535,7 +752,7 @@ class _ActionQueuesSection extends ConsumerWidget {
                   : 'لا توجد عمليات فاشلة',
           icon: Icons.error_outline_rounded,
           color: DSColors.error,
-          path: '/admin/payments',
+          path: '/admin/payments?status=failed',
           active: count.value > 0,
           error: count.hasError,
         ),

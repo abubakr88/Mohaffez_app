@@ -39,7 +39,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   @override
   Widget build(BuildContext context) {
     final width = _collapsed ? 64.0 : 240.0;
-    final location = GoRouterState.of(context).uri.toString();
+    final location = GoRouterState.of(context).uri.path;
 
     return AnimatedContainer(
       duration: DSDuration.base,

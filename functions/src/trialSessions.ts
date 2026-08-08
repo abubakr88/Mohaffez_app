@@ -2,10 +2,12 @@ import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from './utils/admin';
 import { isAcceptingNewBookings } from './teacherBookingPolicy';
 import {
+  ageAtDate,
   allowedLocalDayKeys,
   canRetryTrialRequest,
   intervalIsInsideWindow,
   localDayKey,
+  normalizeTrialStudentPreparation,
 } from './trialSessionPolicy';
 
 const STATUS = {
@@ -341,11 +343,23 @@ export const createTrialSessionRequest = functions.https.onCall(
     );
     const guardianName = optionalString(data?.guardianName);
     const requestedStudentName = optionalString(data?.studentName);
+    const studentPreparation = normalizeTrialStudentPreparation(
+      data?.studentPreparation,
+    );
+    const studentAge = studentProfileBirthDate === null
+      ? null
+      : ageAtDate(studentProfileBirthDate.toDate(), new Date());
 
     if (!mohaffezId || !['online', 'home', 'mosque'].includes(sessionType)) {
       throw new functions.https.HttpsError(
         'invalid-argument',
         'Teacher and session type are required',
+      );
+    }
+    if (data?.studentPreparation != null && studentPreparation === null) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Student preparation answers are invalid',
       );
     }
     if (
@@ -468,6 +482,8 @@ export const createTrialSessionRequest = functions.https.onCall(
         studentProfileName: studentProfileName ?? displayStudentName,
         studentProfileGender: studentProfileGender ?? null,
         studentProfileBirthDate: studentProfileBirthDate ?? null,
+        studentAge,
+        studentPreparation: studentPreparation ?? null,
         mohaffezId,
         mohaffezName: teacher.name ?? teacher.displayName ?? '',
         sessionType,

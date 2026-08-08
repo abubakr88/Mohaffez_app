@@ -75,6 +75,14 @@ class UserModel with _$UserModel {
     String? meetingLink,
     @Default({}) Map<String, String> meetingLinks,
     String? specialization,
+    @Default({}) Map<String, bool> teachingServices,
+    @Default({}) Map<String, Map<String, bool>> learnerAudiences,
+    @Default({}) Map<String, bool> learnerAgeGroups,
+    @Default({}) Map<String, bool> learnerGenders,
+    @Default({}) Map<String, bool> learnerLevels,
+    @Default({}) Map<String, bool> teachingLanguages,
+    String? primaryTeachingLanguage,
+    @Default(0) int discoveryProfileVersion,
     String? phoneNumber,
     @Default(0) int followerCount,
     @Default(0) int followingCount,
@@ -126,6 +134,26 @@ class UserModel with _$UserModel {
           )
         : <String, String>{};
 
+    Map<String, bool> booleanFacet(Object? raw) {
+      if (raw is! Map) return const {};
+      return {
+        for (final entry in raw.entries)
+          if (entry.value == true) entry.key.toString(): true,
+      };
+    }
+
+    Map<String, Map<String, bool>> audienceMatrix(Object? raw) {
+      if (raw is! Map) return const {};
+      return {
+        for (final ageEntry in raw.entries)
+          if (ageEntry.value is Map)
+            ageEntry.key.toString(): {
+              for (final genderEntry in (ageEntry.value as Map).entries)
+                if (genderEntry.value == true) genderEntry.key.toString(): true,
+            },
+      };
+    }
+
     return UserModel.fromJson({
       ...data,
       'uid': doc.id,
@@ -133,6 +161,12 @@ class UserModel with _$UserModel {
       'email': email,
       'role': role.isNotEmpty ? role : 'student',
       'meetingLinks': meetingLinks,
+      'teachingServices': booleanFacet(data['teachingServices']),
+      'learnerAudiences': audienceMatrix(data['learnerAudiences']),
+      'learnerAgeGroups': booleanFacet(data['learnerAgeGroups']),
+      'learnerGenders': booleanFacet(data['learnerGenders']),
+      'learnerLevels': booleanFacet(data['learnerLevels']),
+      'teachingLanguages': booleanFacet(data['teachingLanguages']),
     });
   }
 }

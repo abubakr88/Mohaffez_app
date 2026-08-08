@@ -81,8 +81,7 @@ class _PayoutCard extends ConsumerWidget {
                   children: [
                     Text(name, style: DSText.bodyMedium(context)),
                     Text('طُلب في ${_date(payout.createdAt)}',
-                        style:
-                            DSText.caption(context, color: DSColors.text3)),
+                        style: DSText.caption(context, color: DSColors.text3)),
                   ],
                 ),
               ),
@@ -110,8 +109,7 @@ class _PayoutCard extends ConsumerWidget {
     );
   }
 
-  Widget _actions(
-      BuildContext context, WidgetRef ref, String id, String name) {
+  Widget _actions(BuildContext context, WidgetRef ref, String id, String name) {
     if (payout.status == PayoutStatus.requested) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -185,12 +183,9 @@ class _PayoutCard extends ConsumerWidget {
         DSButton(
             label: 'إلغاء',
             variant: DSButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(false)),
+            onPressed: () => Navigator.of(context).pop(false)),
         DSButton(
-            label: 'تأكيد',
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true)),
+            label: 'تأكيد', onPressed: () => Navigator.of(context).pop(true)),
       ],
     );
     if (ok != true || !context.mounted) return;
@@ -227,13 +222,11 @@ class _PayoutCard extends ConsumerWidget {
         DSButton(
             label: 'إلغاء',
             variant: DSButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(false)),
+            onPressed: () => Navigator.of(context).pop(false)),
         DSButton(
             label: 'تأكيد الفشل',
             variant: DSButtonVariant.destructive,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true)),
+            onPressed: () => Navigator.of(context).pop(true)),
       ],
     );
     if (ok != true || !context.mounted) return;

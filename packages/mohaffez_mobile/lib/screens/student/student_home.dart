@@ -10,6 +10,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../providers/quiz_access_provider.dart';
+import '../../providers/live_recitation_provider.dart';
+import '../../tour/tour_mode_state.dart';
+import '../../providers/quran_local_providers.dart';
 import '../../providers/trial_session_provider.dart';
 import '../../services/app_version_service.dart';
 import '../../shared/widgets/error_widgets.dart';
@@ -257,7 +260,22 @@ class StudentHomeContent extends ConsumerWidget {
         ref.watch(activeSubscriptionsProvider(studentId));
     final studentUpcomingAsync =
         ref.watch(studentUpcomingSessionsProvider(studentId));
+    final challengeV2Enabled =
+        ref.watch(systemConfigProvider).valueOrNull?.challengeV2Enabled ?? true;
+    final inTourMode = ref.watch(tourModeProvider).active;
     final now = serverNow(ref);
+    final activeChallenge = activeChallengeFromSessions(
+      studentUpcomingAsync.valueOrNull ?? const [],
+      studentId: studentId,
+      studentProfileId: activeLearnerProfileId,
+      now: now,
+    );
+    final activeLiveRecitation = activeLiveRecitationSessionFromSessions(
+      studentUpcomingAsync.valueOrNull ?? const [],
+      studentId: studentId,
+      studentProfileId: activeLearnerProfileId,
+      now: now,
+    );
 
     final nextSession = studentUpcomingAsync.when<Map<String, dynamic>?>(
       data: (sessions) {
@@ -429,10 +447,20 @@ class StudentHomeContent extends ConsumerWidget {
                         learnerName: nextSessionLearnerName,
                       ),
                       if (nextSessionDate != null) const SizedBox(height: 20),
+                      _QuranAccessCard(
+                        studentId: studentId,
+                        studentProfileId: activeLearnerProfileId,
+                      ),
+                      const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
-                      _QuizAccessCard(studentId: studentId),
-                      const SizedBox(height: 28),
+                      if (challengeV2Enabled && !inTourMode) ...[
+                        _QuizAccessCard(
+                          challenge: activeChallenge,
+                          liveRecitation: activeLiveRecitation,
+                        ),
+                        const SizedBox(height: 28),
+                      ],
                       _AssignmentsSection(
                         studentId: studentId,
                         studentProfileId: activeLearnerProfileId,
@@ -997,6 +1025,158 @@ class _StatCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// INTERACTIVE QURAN ACCESS
+// ═══════════════════════════════════════════════════════════════════════════════
+class _QuranAccessCard extends ConsumerWidget {
+  const _QuranAccessCard({
+    required this.studentId,
+    this.studentProfileId,
+  });
+
+  final String studentId;
+  final String? studentProfileId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scope = (
+      userId: studentId,
+      studentProfileId: studentProfileId,
+    );
+    final progress = ref.watch(quranLocalProgressProvider(scope)).valueOrNull;
+    final sessions = ref.watch(quranCachedSessionsProvider(scope)).valueOrNull;
+    final latest = sessions == null || sessions.isEmpty ? null : sessions.first;
+    String description;
+    if (latest?.hasHifz == true && latest?.hasMuraja == true) {
+      description = 'لديك ورد حفظ ومراجعة من آخر جلسة';
+    } else if (latest?.hasHifz == true) {
+      description = 'لديك ورد حفظ جديد من آخر جلسة';
+    } else if (latest?.hasMuraja == true) {
+      description = 'لديك ورد مراجعة من آخر جلسة';
+    } else if ((progress?.lastPage ?? 1) > 1) {
+      description = 'متابعة القراءة من صفحة ${progress!.lastPage}';
+    } else {
+      description = 'تصفح الصفحات والسور والأجزاء';
+    }
+
+    return Semantics(
+      button: true,
+      label: 'فتح المصحف التفاعلي',
+      child: Material(
+        color: AppThemeConstants.transparent,
+        borderRadius: _DS.r16,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.push('/interactive-quran');
+          },
+          borderRadius: _DS.r16,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: AlignmentDirectional.topStart,
+                end: AlignmentDirectional.bottomEnd,
+                colors: [_DS.teal800, _DS.teal600],
+              ),
+              borderRadius: _DS.r16,
+              border: Border.all(
+                color: AppThemeConstants.secondary.withValues(alpha: 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _DS.teal700.withValues(alpha: 0.22),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                PositionedDirectional(
+                  end: -18,
+                  top: -26,
+                  child: Icon(
+                    Icons.auto_stories_rounded,
+                    size: 112,
+                    color: AppThemeConstants.white.withValues(alpha: 0.06),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.14),
+                          borderRadius: _DS.r12,
+                          border: Border.all(
+                            color:
+                                AppThemeConstants.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.menu_book_rounded,
+                          size: 29,
+                          color: AppThemeConstants.secondary,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'المصحف التفاعلي',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: AppThemeConstants.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.78),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 16,
+                          color: AppThemeConstants.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ACTIONS SECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 class _ActionsSection extends StatelessWidget {
@@ -1154,63 +1334,51 @@ class _ActionCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // QUIZ ACCESS CARD
 // ═══════════════════════════════════════════════════════════════════════════════
-class _QuizAccessCard extends ConsumerWidget {
-  final String studentId;
-  const _QuizAccessCard({required this.studentId});
+class _QuizAccessCard extends StatelessWidget {
+  final SessionChallengeInfo? challenge;
+  final LiveRecitationSessionInfo? liveRecitation;
+  const _QuizAccessCard({
+    required this.challenge,
+    required this.liveRecitation,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final quizAsync = ref.watch(quizUnlockedSessionProvider(studentId));
-
-    final unlockInfo = quizAsync.valueOrNull;
-    final isUnlocked = unlockInfo != null;
+  Widget build(BuildContext context) {
+    final isSessionChallenge = challenge != null;
+    final activeChallenge = challenge;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel(
           title: 'تحديات الجلسة',
-          subtitle: 'يفتحها محفظك أثناء الجلسة',
+          subtitle: 'مغامرات ممتعة، وتحديات خاصة في حلقاتك',
         ),
         const SizedBox(height: 14),
+        if (liveRecitation != null) ...[
+          _LiveRecitationAccessCard(info: liveRecitation!),
+          const SizedBox(height: 12),
+        ],
         Material(
           color: AppThemeConstants.transparent,
           child: InkWell(
-            onTap: isUnlocked
-                ? () {
-                    HapticFeedback.lightImpact();
-                    context.push(
-                      '/session-quiz'
-                      '?mohaffezId=${unlockInfo.mohaffezId}'
-                      '&studentId=$studentId'
-                      '&sessionId=${unlockInfo.sessionId}',
-                    );
-                  }
-                : () {
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'يفتح المحفظ التحديات أثناء الجلسة',
-                          textDirection: TextDirection.rtl,
-                        ),
-                        backgroundColor: AppThemeConstants.primary,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/student-challenge', extra: activeChallenge);
+            },
             borderRadius: _DS.r16,
             child: Ink(
               decoration: BoxDecoration(
-                color: isUnlocked
+                color: isSessionChallenge
                     ? const Color(0xFF0E8278)
                     : AppThemeConstants.white,
                 borderRadius: _DS.r16,
                 border: Border.all(
-                  color: isUnlocked ? const Color(0xFF0E8278) : _DS.border,
-                  width: isUnlocked ? 0 : 1,
+                  color:
+                      isSessionChallenge ? const Color(0xFF0E8278) : _DS.border,
+                  width: isSessionChallenge ? 0 : 1,
                 ),
-                boxShadow: isUnlocked
+                boxShadow: isSessionChallenge
                     ? [
                         BoxShadow(
                           color:
@@ -1230,16 +1398,18 @@ class _QuizAccessCard extends ConsumerWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: isUnlocked
+                        color: isSessionChallenge
                             ? AppThemeConstants.white.withValues(alpha: 0.2)
                             : _DS.teal50,
                         borderRadius: _DS.r12,
                       ),
                       child: Icon(
-                        isUnlocked
+                        isSessionChallenge
                             ? Icons.extension_rounded
-                            : Icons.lock_rounded,
-                        color: isUnlocked ? AppThemeConstants.white : _DS.text3,
+                            : Icons.emoji_events_rounded,
+                        color: isSessionChallenge
+                            ? AppThemeConstants.white
+                            : AppThemeConstants.primary,
                         size: 24,
                       ),
                     ),
@@ -1249,25 +1419,31 @@ class _QuizAccessCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isUnlocked
-                                ? 'تحديات الجلسة — مفعّلة!'
-                                : 'تحديات الجلسة',
+                            isSessionChallenge
+                                ? activeChallenge!.hasScoredAttempt
+                                    ? 'أعد تحدي جلستك'
+                                    : 'تحديات جلستك متاحة'
+                                : 'مغامرة التحديات',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
-                              color: isUnlocked
+                              color: isSessionChallenge
                                   ? AppThemeConstants.white
                                   : _DS.text1,
                             ),
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            isUnlocked
-                                ? 'اضغط لبدء تحديات الحفظ والتجويد'
-                                : 'في انتظار المحفظ ليفتح التحديات',
+                            isSessionChallenge
+                                ? activeChallenge!.hasScoredAttempt
+                                    ? '${activeChallenge.questions.length} أسئلة للتدريب دون نقاط إضافية'
+                                    : '${activeChallenge.questions.length} أسئلة مخصصة'
+                                        '${activeChallenge.mohaffezName.isEmpty ? '' : ' من ${activeChallenge.mohaffezName}'}'
+                                        '${activeChallenge.studentProfileName?.trim().isNotEmpty == true ? ' • ${activeChallenge.studentProfileName}' : ''}'
+                                : 'اختر نوع التحدي الذي تحبه',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isUnlocked
+                              color: isSessionChallenge
                                   ? AppThemeConstants.white
                                       .withValues(alpha: 0.8)
                                   : _DS.text3,
@@ -1277,14 +1453,44 @@ class _QuizAccessCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(
-                      isUnlocked
-                          ? Icons.arrow_back_ios_new_rounded
-                          : Icons.lock_outline_rounded,
-                      size: 16,
-                      color: isUnlocked
-                          ? AppThemeConstants.white.withValues(alpha: 0.8)
-                          : _DS.text3,
+                    Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSessionChallenge
+                                ? AppThemeConstants.white
+                                    .withValues(alpha: 0.16)
+                                : _DS.teal50,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            isSessionChallenge
+                                ? activeChallenge!.hasScoredAttempt
+                                    ? 'إعادة تدريب'
+                                    : 'مخصص لك'
+                                : 'استمتع وتعلم',
+                            style: TextStyle(
+                              color: isSessionChallenge
+                                  ? AppThemeConstants.white
+                                  : AppThemeConstants.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 14,
+                          color: isSessionChallenge
+                              ? AppThemeConstants.white.withValues(alpha: 0.8)
+                              : _DS.text3,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1293,6 +1499,98 @@ class _QuizAccessCard extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _LiveRecitationAccessCard extends StatelessWidget {
+  final LiveRecitationSessionInfo info;
+
+  const _LiveRecitationAccessCard({required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppThemeConstants.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          context.push(
+            '/live-recitation/${info.sessionId}',
+            extra: {'mohaffezName': info.mohaffezName},
+          );
+        },
+        borderRadius: _DS.r16,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+            ),
+            borderRadius: _DS.r16,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F766E).withValues(alpha: 0.24),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                _LiveRecitationIcon(),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'كروت التسميع المباشرة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'جلستك بدأت — اختر كرتًا وابدأ التسميع',
+                        style: TextStyle(
+                          color: Color(0xFFD5FAF5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveRecitationIcon extends StatelessWidget {
+  const _LiveRecitationIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: _DS.r12,
+      ),
+      child: const Icon(Icons.style_rounded, color: Colors.white, size: 26),
     );
   }
 }

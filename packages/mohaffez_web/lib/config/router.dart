@@ -60,7 +60,7 @@ class _RouterNotifier extends ChangeNotifier {
 
   String? redirect(BuildContext context, GoRouterState state) {
     final auth = _ref.read(authProvider);
-    final location = state.uri.toString();
+    final location = state.uri.path;
     final isLogin = location == '/login';
 
     if (auth.step == AuthStep.loading) return null;
@@ -221,7 +221,26 @@ final webRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/admin', builder: (_, __) => const AdminDashboardPage()),
           GoRoute(
-              path: '/admin/users', builder: (_, __) => const AdminUsersPage()),
+            path: '/admin/users',
+            builder: (_, state) => AdminUsersPage(
+              initialRoleFilter: _allowedQueryParameter(
+                state,
+                'role',
+                const {'student', 'parent', 'mohaffez', 'admin'},
+              ),
+              initialStatusFilter: _allowedQueryParameter(
+                state,
+                'status',
+                const {
+                  'active',
+                  'pending_approval',
+                  'rejected',
+                  'suspended',
+                  'deleted',
+                },
+              ),
+            ),
+          ),
           GoRoute(
             path: '/admin/users/:id',
             builder: (_, s) =>
@@ -231,11 +250,31 @@ final webRouterProvider = Provider<GoRouter>((ref) {
               path: '/admin/approvals',
               builder: (_, __) => const AdminApprovalsPage()),
           GoRoute(
-              path: '/admin/sessions',
-              builder: (_, __) => const AdminSessionsPage()),
+            path: '/admin/sessions',
+            builder: (_, state) => AdminSessionsPage(
+              initialFilter: _allowedQueryParameter(
+                state,
+                'status',
+                const {'live', 'completed', 'cancelled', 'pending'},
+              ),
+            ),
+          ),
           GoRoute(
-              path: '/admin/payments',
-              builder: (_, __) => const AdminPaymentsPage()),
+            path: '/admin/payments',
+            builder: (_, state) => AdminPaymentsPage(
+              initialStatusFilter: _allowedQueryParameter(
+                state,
+                'status',
+                const {
+                  'pending',
+                  'processing',
+                  'completed',
+                  'failed',
+                  'refunded',
+                },
+              ),
+            ),
+          ),
           GoRoute(
               path: '/admin/payouts',
               builder: (_, __) => const AdminPayoutsPage()),
@@ -258,8 +297,23 @@ final webRouterProvider = Provider<GoRouter>((ref) {
               path: '/admin/slot-locks',
               builder: (_, __) => const AdminSlotLocksPage()),
           GoRoute(
-              path: '/admin/payment-events',
-              builder: (_, __) => const AdminPaymentEventsPage()),
+            path: '/admin/payment-events',
+            builder: (_, state) => AdminPaymentEventsPage(
+              initialTypeFilter: _allowedQueryParameter(
+                state,
+                'type',
+                const {
+                  'payment_created',
+                  'payment_processing',
+                  'webhook_received',
+                  'payment_completed',
+                  'payment_failed',
+                  'booking_confirmed',
+                  'subscription_created',
+                },
+              ),
+            ),
+          ),
           GoRoute(
               path: '/admin/audit-log',
               builder: (_, __) => const AdminAuditLogPage()),
@@ -268,3 +322,12 @@ final webRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+String? _allowedQueryParameter(
+  GoRouterState state,
+  String name,
+  Set<String> allowed,
+) {
+  final value = state.uri.queryParameters[name];
+  return allowed.contains(value) ? value : null;
+}

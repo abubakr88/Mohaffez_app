@@ -262,9 +262,13 @@ Screen ──watch──▶ Provider (AsyncValue state) ──▶ Repository ─
 `notification_model`, `suspension_model`, `system_config_model`.
 
 ### Key field conventions
-- **Session rating pipeline:** student writes `teacherRating` (int) +
-  `reviewNotes` (string) to `hafizSessions`; Cloud Function `onSessionCompleted`
-  recomputes the teacher's `rating` average on `users/{mohaffezId}`. Field names
+- **Session rating pipeline:** student writes `teacherRating` (int),
+  `teacherRatingScale` (5), `technicalIssueSource`, optional
+  `teacherRatingReason`, and `reviewNotes` to `hafizSessions`; Cloud Function
+  `onTeacherRated` counts only explicit V2 five-point values and updates the
+  teacher's public average on `users/{mohaffezId}`. Legacy values and feedback
+  with `teacherRatingReason == 'technical_only'` remain admin-visible but are
+  excluded from that average. Public aggregates use `ratingPolicyVersion == 2`.
   must match Firestore security rules.
 - **Date fields** may be `Timestamp`, `DateTime`, or `String` — always normalize
   via a `_toDateTime(dynamic)` helper.

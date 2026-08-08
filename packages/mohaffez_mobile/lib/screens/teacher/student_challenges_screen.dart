@@ -1,41 +1,43 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _DS {
-  static const bg     = Color(0xFFF4F7F6);
-  static const text1  = Color(0xFF111827);
-  static const text2  = Color(0xFF4B5563);
-  static const text3  = Color(0xFF9CA3AF);
+  static const bg = Color(0xFFF4F7F6);
+  static const text1 = Color(0xFF111827);
+  static const text2 = Color(0xFF4B5563);
+  static const text3 = Color(0xFF9CA3AF);
   static const border = Color(0xFFE5EDE9);
-  static const r12    = BorderRadius.all(Radius.circular(12));
-  static const r16    = BorderRadius.all(Radius.circular(16));
+  static const r12 = BorderRadius.all(Radius.circular(12));
+  static const r16 = BorderRadius.all(Radius.circular(16));
 
   // per-type colours
   static Color typeColor(ChallengeType t) => switch (t) {
-    ChallengeType.completeAyah  => const Color(0xFF1A9E84),
-    ChallengeType.nameSurah     => const Color(0xFFE67E22),
-    ChallengeType.tajweedRule   => const Color(0xFF7A5AF8),
-    ChallengeType.wordMeaning   => const Color(0xFF2563EB),
-    ChallengeType.openQuestion  => const Color(0xFF2E8B57),
-  };
+        ChallengeType.completeAyah => const Color(0xFF1A9E84),
+        ChallengeType.nameSurah => const Color(0xFFE67E22),
+        ChallengeType.tajweedRule => const Color(0xFF7A5AF8),
+        ChallengeType.orderAyahs => const Color(0xFFB7791F),
+        ChallengeType.wordMeaning => const Color(0xFF2563EB),
+        ChallengeType.openQuestion => const Color(0xFF2E8B57),
+      };
   static Color typeBg(ChallengeType t) => switch (t) {
-    ChallengeType.completeAyah  => const Color(0xFFEAF6F3),
-    ChallengeType.nameSurah     => const Color(0xFFFFF3E0),
-    ChallengeType.tajweedRule   => const Color(0xFFF0EEFF),
-    ChallengeType.wordMeaning   => const Color(0xFFE3F2FD),
-    ChallengeType.openQuestion  => const Color(0xFFE8F5E9),
-  };
+        ChallengeType.completeAyah => const Color(0xFFEAF6F3),
+        ChallengeType.nameSurah => const Color(0xFFFFF3E0),
+        ChallengeType.tajweedRule => const Color(0xFFF0EEFF),
+        ChallengeType.orderAyahs => const Color(0xFFFFF8E1),
+        ChallengeType.wordMeaning => const Color(0xFFE3F2FD),
+        ChallengeType.openQuestion => const Color(0xFFE8F5E9),
+      };
   static IconData typeIcon(ChallengeType t) => switch (t) {
-    ChallengeType.completeAyah  => Icons.auto_stories_rounded,
-    ChallengeType.nameSurah     => Icons.search_rounded,
-    ChallengeType.tajweedRule   => Icons.menu_book_rounded,
-    ChallengeType.wordMeaning   => Icons.translate_rounded,
-    ChallengeType.openQuestion  => Icons.help_outline_rounded,
-  };
+        ChallengeType.completeAyah => Icons.auto_stories_rounded,
+        ChallengeType.nameSurah => Icons.search_rounded,
+        ChallengeType.tajweedRule => Icons.menu_book_rounded,
+        ChallengeType.orderAyahs => Icons.reorder_rounded,
+        ChallengeType.wordMeaning => Icons.translate_rounded,
+        ChallengeType.openQuestion => Icons.help_outline_rounded,
+      };
 }
 
 class StudentChallengesScreen extends ConsumerWidget {
@@ -81,8 +83,7 @@ class StudentChallengesScreen extends ConsumerWidget {
         ),
         body: questionsAsync.when(
           data: (questions) => _buildBody(context, ref, questions, params),
-          loading: () =>
-              const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, __) => const Center(
             child: Text('تعذّر التحميل. يرجى المحاولة مرة أخرى',
                 style: TextStyle(color: AppThemeConstants.error)),
@@ -105,7 +106,9 @@ class StudentChallengesScreen extends ConsumerWidget {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               // Banner
-              _InfoBanner(total: all.length, active: all.where((q) => q.isActive).length),
+              _InfoBanner(
+                  total: all.length,
+                  active: all.where((q) => q.isActive).length),
               const SizedBox(height: 24),
 
               // One section per challenge type
@@ -221,8 +224,8 @@ class _InfoBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppThemeConstants.primary.withValues(alpha: 0.07),
         borderRadius: _DS.r16,
-        border: Border.all(
-            color: AppThemeConstants.primary.withValues(alpha: 0.2)),
+        border:
+            Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -282,9 +285,9 @@ class _TypeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color  = _DS.typeColor(type);
-    final bg     = _DS.typeBg(type);
-    final icon   = _DS.typeIcon(type);
+    final color = _DS.typeColor(type);
+    final bg = _DS.typeBg(type);
+    final icon = _DS.typeIcon(type);
 
     return Container(
       decoration: BoxDecoration(
@@ -300,12 +303,14 @@ class _TypeSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: bg,
-              border: Border(bottom: BorderSide(color: color.withValues(alpha: 0.2))),
+              border: Border(
+                  bottom: BorderSide(color: color.withValues(alpha: 0.2))),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 36, height: 36,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
                       borderRadius: _DS.r12),
@@ -322,7 +327,8 @@ class _TypeSection extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: _DS.r12,
@@ -355,11 +361,10 @@ class _TypeSection extends StatelessWidget {
           else
             ...questions.asMap().entries.map((e) {
               final idx = e.key;
-              final q   = e.value;
+              final q = e.value;
               return Column(
                 children: [
-                  if (idx > 0)
-                    const Divider(height: 1, color: _DS.border),
+                  if (idx > 0) const Divider(height: 1, color: _DS.border),
                   _QuestionTile(
                     question: q,
                     onEdit: () => onEdit(q),
@@ -372,18 +377,23 @@ class _TypeSection extends StatelessWidget {
 
           // Add button
           InkWell(
-            onTap: () { HapticFeedback.lightImpact(); onAdd(); },
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onAdd();
+            },
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: color.withValues(alpha: 0.2))),
+                border: Border(
+                    top: BorderSide(color: color.withValues(alpha: 0.2))),
                 color: bg.withValues(alpha: 0.5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle_outline_rounded, color: color, size: 16),
+                  Icon(Icons.add_circle_outline_rounded,
+                      color: color, size: 16),
                   const SizedBox(width: 6),
                   Text('إضافة سؤال',
                       style: TextStyle(
@@ -417,14 +427,14 @@ class _QuestionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final diffColor = switch (question.difficulty) {
-      'easy'   => const Color(0xFF2E8B57),
-      'hard'   => AppThemeConstants.error,
-      _        => const Color(0xFFE67E22),
+      'easy' => const Color(0xFF2E8B57),
+      'hard' => AppThemeConstants.error,
+      _ => const Color(0xFFE67E22),
     };
     final diffLabel = switch (question.difficulty) {
-      'easy'   => 'سهل',
-      'hard'   => 'صعب',
-      _        => 'متوسط',
+      'easy' => 'سهل',
+      'hard' => 'صعب',
+      _ => 'متوسط',
     };
 
     return Padding(
@@ -468,8 +478,8 @@ class _QuestionTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: diffColor.withValues(alpha: 0.1),
                         borderRadius: _DS.r12,
-                        border: Border.all(
-                            color: diffColor.withValues(alpha: 0.3)),
+                        border:
+                            Border.all(color: diffColor.withValues(alpha: 0.3)),
                       ),
                       child: Text(diffLabel,
                           style: TextStyle(
@@ -477,25 +487,21 @@ class _QuestionTile extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                               color: diffColor)),
                     ),
-                    if (question.hint != null &&
-                        question.hint!.isNotEmpty) ...[
+                    if (question.hint != null && question.hint!.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       const Icon(Icons.lightbulb_outline_rounded,
                           size: 12, color: _DS.text3),
                       const SizedBox(width: 2),
                       const Text('تلميح',
-                          style:
-                              TextStyle(fontSize: 10, color: _DS.text3)),
+                          style: TextStyle(fontSize: 10, color: _DS.text3)),
                     ],
                     if (question.answer != null &&
                         question.answer!.isNotEmpty) ...[
                       const SizedBox(width: 6),
-                      const Icon(Icons.key_rounded,
-                          size: 12, color: _DS.text3),
+                      const Icon(Icons.key_rounded, size: 12, color: _DS.text3),
                       const SizedBox(width: 2),
                       const Text('إجابة مرجعية',
-                          style:
-                              TextStyle(fontSize: 10, color: _DS.text3)),
+                          style: TextStyle(fontSize: 10, color: _DS.text3)),
                     ],
                   ],
                 ),
@@ -504,8 +510,8 @@ class _QuestionTile extends StatelessWidget {
           ),
           // Edit / delete actions
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded,
-                size: 18, color: _DS.text3),
+            icon:
+                const Icon(Icons.more_vert_rounded, size: 18, color: _DS.text3),
             onSelected: (v) {
               if (v == 'edit') onEdit();
               if (v == 'delete') onDelete();
@@ -553,9 +559,9 @@ class _QuestionSheetState extends State<_QuestionSheet> {
     super.initState();
     final e = widget.existing;
     _questionCtrl = TextEditingController(text: e?.question ?? '');
-    _hintCtrl     = TextEditingController(text: e?.hint ?? '');
-    _answerCtrl   = TextEditingController(text: e?.answer ?? '');
-    _difficulty   = e?.difficulty ?? 'medium';
+    _hintCtrl = TextEditingController(text: e?.hint ?? '');
+    _answerCtrl = TextEditingController(text: e?.answer ?? '');
+    _difficulty = e?.difficulty ?? 'medium';
   }
 
   @override
@@ -576,7 +582,8 @@ class _QuestionSheetState extends State<_QuestionSheet> {
         type: widget.type,
         question: q,
         hint: _hintCtrl.text.trim().isEmpty ? null : _hintCtrl.text.trim(),
-        answer: _answerCtrl.text.trim().isEmpty ? null : _answerCtrl.text.trim(),
+        answer:
+            _answerCtrl.text.trim().isEmpty ? null : _answerCtrl.text.trim(),
         difficulty: _difficulty,
         isActive: widget.existing?.isActive ?? true,
         createdAt: widget.existing?.createdAt ?? DateTime.now(),
@@ -599,7 +606,7 @@ class _QuestionSheetState extends State<_QuestionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final color  = _DS.typeColor(widget.type);
+    final color = _DS.typeColor(widget.type);
     final isEdit = widget.existing != null;
 
     return Directionality(
@@ -620,7 +627,8 @@ class _QuestionSheetState extends State<_QuestionSheet> {
               // Handle
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: _DS.border,
                     borderRadius: BorderRadius.circular(2),
@@ -633,12 +641,14 @@ class _QuestionSheetState extends State<_QuestionSheet> {
               Row(
                 children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.12),
                       borderRadius: _DS.r12,
                     ),
-                    child: Icon(_DS.typeIcon(widget.type), color: color, size: 18),
+                    child:
+                        Icon(_DS.typeIcon(widget.type), color: color, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -651,7 +661,10 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                               fontSize: 16, fontWeight: FontWeight.w800),
                         ),
                         Text(ChallengeTypeX(widget.type).label,
-                            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: color,
+                                fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -713,8 +726,8 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                     borderRadius: _DS.r12,
                     borderSide: BorderSide(color: color, width: 1.5),
                   ),
-                  prefixIcon: const Icon(Icons.key_rounded,
-                      color: _DS.text3, size: 18),
+                  prefixIcon:
+                      const Icon(Icons.key_rounded, color: _DS.text3, size: 18),
                 ),
               ),
               const SizedBox(height: 20),
@@ -725,14 +738,14 @@ class _QuestionSheetState extends State<_QuestionSheet> {
               Row(
                 children: ['easy', 'medium', 'hard'].map((d) {
                   final label = switch (d) {
-                    'easy'  => 'سهل',
-                    'hard'  => 'صعب',
-                    _       => 'متوسط',
+                    'easy' => 'سهل',
+                    'hard' => 'صعب',
+                    _ => 'متوسط',
                   };
                   final dColor = switch (d) {
-                    'easy'  => const Color(0xFF2E8B57),
-                    'hard'  => AppThemeConstants.error,
-                    _       => const Color(0xFFE67E22),
+                    'easy' => const Color(0xFF2E8B57),
+                    'hard' => AppThemeConstants.error,
+                    _ => const Color(0xFFE67E22),
                   };
                   final selected = _difficulty == d;
                   return Expanded(
@@ -749,9 +762,7 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                                 : _DS.bg,
                             borderRadius: _DS.r12,
                             border: Border.all(
-                              color: selected
-                                  ? dColor
-                                  : _DS.border,
+                              color: selected ? dColor : _DS.border,
                               width: selected ? 1.5 : 1,
                             ),
                           ),
@@ -786,7 +797,8 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                   ),
                   child: _saving
                       ? const SizedBox(
-                          width: 20, height: 20,
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: AppThemeConstants.white),
                         )
@@ -811,10 +823,12 @@ class _QuestionSheetState extends State<_QuestionSheet> {
       );
 
   String _hintForType(ChallengeType t) => switch (t) {
-    ChallengeType.completeAyah  => 'مثال: وَلَا تَقُولَنَّ لِشَيْءٍ...',
-    ChallengeType.nameSurah     => 'مثال: اكتب الآية التي تريد أن يحدد سورتها',
-    ChallengeType.tajweedRule   => 'مثال: ما حكم الميم الساكنة في: أَم مَّنْ...؟',
-    ChallengeType.wordMeaning   => 'مثال: ما معنى كلمة "الصِّرَاط"؟',
-    ChallengeType.openQuestion  => 'مثال: كم عدد آيات سورة الفاتحة؟',
-  };
+        ChallengeType.completeAyah => 'مثال: وَلَا تَقُولَنَّ لِشَيْءٍ...',
+        ChallengeType.nameSurah => 'مثال: اكتب الآية التي تريد أن يحدد سورتها',
+        ChallengeType.tajweedRule =>
+          'مثال: ما حكم الميم الساكنة في: أَم مَّنْ...؟',
+        ChallengeType.orderAyahs => 'أدخل الآيات بالترتيب الصحيح',
+        ChallengeType.wordMeaning => 'مثال: ما معنى كلمة "الصِّرَاط"؟',
+        ChallengeType.openQuestion => 'مثال: كم عدد آيات سورة الفاتحة؟',
+      };
 }

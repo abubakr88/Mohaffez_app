@@ -195,7 +195,7 @@ class ArabicLabels {
   static const String acceptRequest = 'قبول الطلب';
   static const String rejectRequest = 'رفض الطلب';
   static const String markAsCompleted = 'تعليم كمكتمل';
-  static const String rateSession = 'تقييم الجلسة';
+  static const String rateSession = 'تقييم أداء المحفظ';
   static const String writeReview = 'كتابة مراجعة';
   static const String completeSession = 'إكمال الجلسة';
   static const String viewDetails = 'عرض التفاصيل';

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,11 +25,24 @@ class RateSessionScreen extends ConsumerStatefulWidget {
 /// as on-time so the session counts toward the teacher's tier.
 enum _Punctuality { onTime, slightlyLate, late }
 
+enum _TechnicalIssueSource { none, student, teacher, app, unknown }
+
+enum _LowRatingReason {
+  unclearExplanation,
+  weakInteraction,
+  unprepared,
+  inappropriateBehavior,
+  technicalOnly,
+  other,
+}
+
 class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   int rating = 0; // Default to 0 to require explicit user selection
   final notesController = TextEditingController();
   bool _isSubmitting = false;
   _Punctuality? _punctuality;
+  _TechnicalIssueSource? _technicalIssueSource;
+  _LowRatingReason? _lowRatingReason;
 
   @override
   void dispose() {
@@ -52,11 +65,15 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
             'هل أنت متأكد أن المحفظ لم يحضر الجلسة؟ سيتم استرداد مبلغ الجلسة كاملاً إلى محفظتك وتسجيل تحذير على حساب المحفظ.',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('تراجع')),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
-              child: const Text('تأكيد الغياب', style: TextStyle(color: AppThemeConstants.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.error),
+              child: const Text('تأكيد الغياب',
+                  style: TextStyle(color: AppThemeConstants.white)),
             ),
           ],
         ),
@@ -87,10 +104,28 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   Future<void> _submitRating() async {
     if (guardWriteInTour(ref, context)) return;
     if (_isSubmitting) return;
+    if (_technicalIssueSource == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى تحديد ما إذا واجهت مشكلة تقنية'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+      return;
+    }
     if (rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('يرجى اختيار تقييم من 1 إلى 10'),
+          content: Text('يرجى تقييم أداء المحفظ من 1 إلى 5'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+      return;
+    }
+    if (rating <= 2 && _lowRatingReason == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار سبب التقييم المنخفض'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -113,6 +148,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
             rating: rating,
             notes: notesController.text.trim(),
             startedLate: _punctuality == _Punctuality.late,
+            technicalIssueSource: _technicalIssueSource!.storageValue,
+            teacherRatingReason: _lowRatingReason?.storageValue,
           );
 
       if (mounted) {
@@ -133,12 +170,14 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   }
 
   String _ratingLabel(int r) {
-    if (r <= 2) return 'ضعيف جداً';
-    if (r <= 4) return 'ضعيف';
-    if (r <= 6) return 'مقبول';
-    if (r <= 8) return 'جيد';
-    if (r == 9) return 'جيد جداً';
-    return 'ممتاز';
+    return switch (r) {
+      1 => 'ضعيف',
+      2 => 'مقبول',
+      3 => 'جيد',
+      4 => 'جيد جداً',
+      5 => 'ممتاز',
+      _ => '',
+    };
   }
 
   @override
@@ -154,7 +193,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   tooltip: 'رجوع',
                 )
               : null,
-          title: const Text('تقييم المحفظ'),
+          title: const Text('تقييم أداء المحفظ'),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -179,7 +218,9 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                         children: [
                           const Text(
                             'المحفظ',
-                            style: TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppThemeConstants.textSecondary),
                           ),
                           Text(
                             widget.mohaffezName,
@@ -197,9 +238,77 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
 
               const SizedBox(height: 32),
 
-              // Rating Section
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppThemeConstants.primary,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'قيّم أداء المحفظ فقط. مشكلات الإنترنت أو التطبيق تُسجّل بشكل منفصل ولا تُنسب تلقائياً إلى المحفظ.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppThemeConstants.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
               const Text(
-                'تقييمك للجلسة',
+                'هل واجهت مشكلة تقنية أثناء الجلسة؟',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'اختر المصدر الذي بدا لك، ويمكنك اختيار «لا أعرف».',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _TechnicalIssueSource.values.map((source) {
+                  return _PunctualityChip(
+                    label: source.label,
+                    icon: source.icon,
+                    selected: _technicalIssueSource == source,
+                    color: source.color,
+                    onTap: () {
+                      setState(() {
+                        _technicalIssueSource = source;
+                        if (source == _TechnicalIssueSource.none &&
+                            _lowRatingReason ==
+                                _LowRatingReason.technicalOnly) {
+                          _lowRatingReason = null;
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 32),
+
+              // Teacher performance rating
+              const Text(
+                'كيف كان أداء المحفظ؟',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -209,19 +318,26 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('ضعيف', style: TextStyle(fontSize: 12, color: AppThemeConstants.error)),
-                  Text('ممتاز', style: TextStyle(fontSize: 12, color: AppThemeConstants.success)),
+                  Text('ضعيف',
+                      style: TextStyle(
+                          fontSize: 12, color: AppThemeConstants.error)),
+                  Text('ممتاز',
+                      style: TextStyle(
+                          fontSize: 12, color: AppThemeConstants.success)),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Star Rating (10 stars) — size 28 + spacing 4 = ~320px fits in one row
+              // Five labelled choices are easier to interpret consistently.
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(10, (index) {
+                children: List.generate(5, (index) {
                   final starRating = index + 1;
                   return GestureDetector(
-                    onTap: () => setState(() => rating = starRating),
+                    onTap: () => setState(() {
+                      rating = starRating;
+                      if (starRating > 2) _lowRatingReason = null;
+                    }),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: AnimatedScale(
@@ -229,11 +345,14 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.elasticOut,
                         child: Icon(
-                          index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          index < rating
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
                           color: index < rating
                               ? AppThemeConstants.secondary
-                              : AppThemeConstants.textSecondary.withValues(alpha: 0.4),
-                          size: 30,
+                              : AppThemeConstants.textSecondary
+                                  .withValues(alpha: 0.4),
+                          size: 42,
                         ),
                       ),
                     ),
@@ -249,19 +368,21 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   duration: const Duration(milliseconds: 200),
                   child: Container(
                     key: ValueKey(rating),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 10),
                     decoration: BoxDecoration(
                       color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppThemeConstants.secondary.withValues(alpha: 0.3),
+                        color:
+                            AppThemeConstants.secondary.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '$rating / 10',
+                          '$rating / 5',
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -284,6 +405,55 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 ),
               ),
 
+              if (rating > 0 && rating <= 2) ...[
+                const SizedBox(height: 28),
+                const Text(
+                  'ما السبب الرئيسي للتقييم المنخفض؟',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'يساعد السبب في حماية العدالة وتحسين الخدمة.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppThemeConstants.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _LowRatingReason.values
+                      .where((reason) =>
+                          reason != _LowRatingReason.technicalOnly ||
+                          (_technicalIssueSource != null &&
+                              _technicalIssueSource !=
+                                  _TechnicalIssueSource.none))
+                      .map((reason) => _PunctualityChip(
+                            label: reason.label,
+                            icon: reason.icon,
+                            selected: _lowRatingReason == reason,
+                            color: reason == _LowRatingReason.technicalOnly
+                                ? AppThemeConstants.info
+                                : AppThemeConstants.warning,
+                            onTap: () =>
+                                setState(() => _lowRatingReason = reason),
+                          ))
+                      .toList(),
+                ),
+                if (_lowRatingReason == _LowRatingReason.technicalOnly) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'سيُحفظ البلاغ للمراجعة، ولن يدخل هذا التقييم في متوسط المحفظ العام.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeConstants.info,
+                    ),
+                  ),
+                ],
+              ],
+
               const SizedBox(height: 32),
 
               // Punctuality question
@@ -301,22 +471,24 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                     icon: Icons.check_circle_outline,
                     selected: _punctuality == _Punctuality.onTime,
                     color: AppThemeConstants.success,
-                    onTap: () => setState(() => _punctuality = _Punctuality.onTime),
+                    onTap: () =>
+                        setState(() => _punctuality = _Punctuality.onTime),
                   ),
                   _PunctualityChip(
                     label: 'تأخر بسيط (أقل من 10 دقائق)',
                     icon: Icons.schedule,
                     selected: _punctuality == _Punctuality.slightlyLate,
                     color: AppThemeConstants.warning,
-                    onTap: () =>
-                        setState(() => _punctuality = _Punctuality.slightlyLate),
+                    onTap: () => setState(
+                        () => _punctuality = _Punctuality.slightlyLate),
                   ),
                   _PunctualityChip(
                     label: 'متأخر أكثر من 10 دقائق',
                     icon: Icons.error_outline,
                     selected: _punctuality == _Punctuality.late,
                     color: AppThemeConstants.error,
-                    onTap: () => setState(() => _punctuality = _Punctuality.late),
+                    onTap: () =>
+                        setState(() => _punctuality = _Punctuality.late),
                   ),
                 ],
               ),
@@ -337,20 +509,21 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 maxLength: 500,
                 textInputAction: TextInputAction.done,
                 buildCounter: (context,
-                    {required currentLength,
-                    required isFocused,
-                    maxLength}) =>
+                        {required currentLength,
+                        required isFocused,
+                        maxLength}) =>
                     Text(
-                      '$currentLength / $maxLength',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: currentLength > (maxLength ?? 500) * 0.9
-                            ? AppThemeConstants.warning
-                            : AppThemeConstants.textSecondary,
-                      ),
-                    ),
+                  '$currentLength / $maxLength',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: currentLength > (maxLength ?? 500) * 0.9
+                        ? AppThemeConstants.warning
+                        : AppThemeConstants.textSecondary,
+                  ),
+                ),
                 decoration: InputDecoration(
-                  hintText: 'شاركنا رأيك حول الجلسة...',
+                  hintText:
+                      'اكتب ملاحظاتك عن أداء المحفظ أو المشكلة التقنية...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -383,7 +556,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary,
-                    disabledBackgroundColor: AppThemeConstants.primary.withValues(alpha: 0.6),
+                    disabledBackgroundColor:
+                        AppThemeConstants.primary.withValues(alpha: 0.6),
                     foregroundColor: AppThemeConstants.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -440,7 +614,9 @@ class _PunctualityChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : AppThemeConstants.surface,
+          color: selected
+              ? color.withValues(alpha: 0.12)
+              : AppThemeConstants.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? color : AppThemeConstants.grey300,
@@ -450,7 +626,8 @@ class _PunctualityChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: selected ? color : AppThemeConstants.grey600),
+            Icon(icon,
+                size: 18, color: selected ? color : AppThemeConstants.grey600),
             const SizedBox(width: 6),
             Text(
               label,
@@ -465,4 +642,67 @@ class _PunctualityChip extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on _TechnicalIssueSource {
+  String get storageValue => switch (this) {
+        _TechnicalIssueSource.none => 'none',
+        _TechnicalIssueSource.student => 'student',
+        _TechnicalIssueSource.teacher => 'teacher',
+        _TechnicalIssueSource.app => 'app',
+        _TechnicalIssueSource.unknown => 'unknown',
+      };
+
+  String get label => switch (this) {
+        _TechnicalIssueSource.none => 'لم توجد مشكلة',
+        _TechnicalIssueSource.student => 'الإنترنت لدي',
+        _TechnicalIssueSource.teacher => 'الإنترنت لدى المحفظ',
+        _TechnicalIssueSource.app => 'التطبيق أو رابط الاجتماع',
+        _TechnicalIssueSource.unknown => 'لا أعرف',
+      };
+
+  IconData get icon => switch (this) {
+        _TechnicalIssueSource.none => Icons.check_circle_outline,
+        _TechnicalIssueSource.student => Icons.wifi_off_outlined,
+        _TechnicalIssueSource.teacher => Icons.person_outline,
+        _TechnicalIssueSource.app => Icons.mobile_off_outlined,
+        _TechnicalIssueSource.unknown => Icons.help_outline,
+      };
+
+  Color get color => switch (this) {
+        _TechnicalIssueSource.none => AppThemeConstants.success,
+        _TechnicalIssueSource.student => AppThemeConstants.warning,
+        _TechnicalIssueSource.teacher => AppThemeConstants.warning,
+        _TechnicalIssueSource.app => AppThemeConstants.info,
+        _TechnicalIssueSource.unknown => AppThemeConstants.textSecondary,
+      };
+}
+
+extension on _LowRatingReason {
+  String get storageValue => switch (this) {
+        _LowRatingReason.unclearExplanation => 'unclear_explanation',
+        _LowRatingReason.weakInteraction => 'weak_interaction',
+        _LowRatingReason.unprepared => 'unprepared',
+        _LowRatingReason.inappropriateBehavior => 'inappropriate_behavior',
+        _LowRatingReason.technicalOnly => 'technical_only',
+        _LowRatingReason.other => 'other',
+      };
+
+  String get label => switch (this) {
+        _LowRatingReason.unclearExplanation => 'الشرح أو التصحيح غير واضح',
+        _LowRatingReason.weakInteraction => 'ضعف التفاعل',
+        _LowRatingReason.unprepared => 'عدم الاستعداد',
+        _LowRatingReason.inappropriateBehavior => 'سلوك غير مناسب',
+        _LowRatingReason.technicalOnly => 'مشكلة تقنية فقط',
+        _LowRatingReason.other => 'سبب آخر',
+      };
+
+  IconData get icon => switch (this) {
+        _LowRatingReason.unclearExplanation => Icons.menu_book_outlined,
+        _LowRatingReason.weakInteraction => Icons.forum_outlined,
+        _LowRatingReason.unprepared => Icons.event_busy_outlined,
+        _LowRatingReason.inappropriateBehavior => Icons.report_outlined,
+        _LowRatingReason.technicalOnly => Icons.wifi_off_outlined,
+        _LowRatingReason.other => Icons.more_horiz,
+      };
 }

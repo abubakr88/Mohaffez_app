@@ -4,6 +4,10 @@ import { createAndSendNotification } from '../utils/notificationHelpers';
 import { SessionEventStore } from '../services/SessionEventStore';
 import { SessionRequestEventType, SessionEventType } from '../types/events.types';
 import { recomputeForTeacherById } from '../payments/recomputeTeacherTiers';
+import {
+  countsTowardTeacherRating,
+  normalizeTeacherRating,
+} from './teacherRatingPolicy';
 
 type RequestDoc = Record<string, unknown>;
 
@@ -582,8 +586,8 @@ export const onSessionCompleted = functions.firestore
   });
 
 /**
- * Firestore trigger: update teacher's rating average when a student submits a rating.
- * Fires when teacherRating changes from 0 → non-zero on a hafizSessions document.
+ * Update the teacher's five-point public average on first rating submission.
+ * Technical-only feedback remains available to support but is not counted.
  */
 export const onTeacherRated = functions.firestore
   .document('hafizSessions/{sessionId}')
@@ -592,10 +596,21 @@ export const onTeacherRated = functions.firestore
     const after = change.after.data() as Record<string, unknown>;
 
     const beforeRating = asNumber(before.teacherRating, 0);
-    const afterRating = asNumber(after.teacherRating, 0);
+    const afterRating = normalizeTeacherRating(after);
 
     // Only process when a new rating is submitted (0 → non-zero)
-    if (beforeRating !== 0 || afterRating === 0) return;
+    if (beforeRating !== 0 || afterRating == null) return;
+
+    // Technical-only feedback remains on the session for support review but
+    // must not change the teacher's public reputation.
+    if (!countsTowardTeacherRating(after)) {
+      functions.logger.info('Teacher rating excluded from public average', {
+        sessionId: context.params.sessionId,
+        reason: after.teacherRatingReason,
+        technicalIssueSource: after.technicalIssueSource,
+      });
+      return;
+    }
 
     const mohaffezId = asString(after.mohaffezId, '');
     const sessionId = context.params.sessionId;
@@ -607,27 +622,52 @@ export const onTeacherRated = functions.firestore
 
     try {
       const teacherRef = db.collection('users').doc(mohaffezId);
+      const sessionRef = change.after.ref;
 
-      await db.runTransaction(async (transaction) => {
+      const applied = await db.runTransaction(async (transaction) => {
+        const currentSession = await transaction.get(sessionRef);
+        if (currentSession.data()?.teacherRatingAppliedAt != null) {
+          return false;
+        }
+
         const teacherDoc = await transaction.get(teacherRef);
         if (!teacherDoc.exists) {
           functions.logger.warn('onTeacherRated: teacher doc not found', { mohaffezId });
-          return;
+          return false;
         }
 
         const data = teacherDoc.data() as Record<string, unknown>;
-        const oldRating = asNumber(data.rating, 0);
-        const oldCount = asNumber(data.reviewCount, 0);
+        const usesCurrentPolicy = asNumber(data.ratingPolicyVersion, 0) === 2;
+        const oldCount = usesCurrentPolicy
+          ? asNumber(data.reviewCount, 0)
+          : 0;
+        const oldSum = usesCurrentPolicy
+          ? asNumber(
+              data.ratingSum,
+              asNumber(data.rating, 0) * oldCount,
+            )
+          : 0;
 
         const newCount = oldCount + 1;
-        const newAvg = (oldRating * oldCount + afterRating) / newCount;
+        const newSum = oldSum + afterRating;
+        const newAvg = newSum / newCount;
 
         transaction.update(teacherRef, {
           rating: Math.round(newAvg * 10) / 10,
+          ratingScale: 5,
+          ratingSum: newSum,
+          ratingPolicyVersion: 2,
           reviewCount: newCount,
           updatedAt: FieldValue.serverTimestamp(),
         });
+        transaction.update(sessionRef, {
+          teacherRatingAppliedAt: FieldValue.serverTimestamp(),
+          teacherRatingAppliedValue: afterRating,
+        });
+        return true;
       });
+
+      if (!applied) return;
 
       functions.logger.info('Teacher rating updated', {
         sessionId,

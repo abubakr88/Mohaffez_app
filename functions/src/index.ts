@@ -126,6 +126,13 @@ export {
   onTeacherNoShowReported,
 } from "./cancellations";
 
+// Cost-efficient student session challenges
+export {
+  publishSessionChallenge,
+  submitSessionChallenge,
+  reviewSessionChallenge,
+} from "./challenges/sessionChallenges";
+
 // Wallet system (double-entry ledger)
 export {
   verifyWalletTopUp,

@@ -22,10 +22,10 @@ final mohaffezProfileProvider =
         throw Exception('المحفظ غير موجود');
       }
 
-      return {
+      return withPublicTeacherRatingV2({
         ...doc.data()!,
         'uid': doc.id,
-      };
+      });
     });
   },
 );
@@ -102,7 +102,7 @@ PricingPlanModel _pricingPlanFromPublicMap(Map<String, dynamic> data) {
 }
 
 /// Provider for follow status
-final followStatusProvider = StreamProvider.family<bool, String>(
+final followStatusProvider = StreamProvider.autoDispose.family<bool, String>(
   (ref, mohaffezId) async* {
     final currentUser = ref.watch(currentUserProvider).value;
     if (currentUser == null) {
@@ -127,7 +127,7 @@ final followStatusProvider = StreamProvider.family<bool, String>(
 /// FAILED_PRECONDITION. The Firestore rules already allow `list` for all
 /// authenticated users and document "rely on client query filter".
 final credentialsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('users')
@@ -148,7 +148,7 @@ final credentialsProvider =
 
 /// ✅ Provider for availability
 final availabilityProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('users')
@@ -169,7 +169,7 @@ final availabilityProvider =
 /// PII-free occupied intervals for the nearby booking horizon. This is only a
 /// UI optimization; the booking Cloud Function remains the conflict authority.
 final bookingCalendarProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     final now = DateTime.now().toUtc();
     final rangeStart = DateTime.utc(now.year, now.month, now.day)
@@ -200,7 +200,7 @@ final bookingCalendarProvider =
 /// teacher's user document so the profile updates in real-time when Cloud
 /// Functions increment completedSessionsCount / studentsServedCount.
 final mohaffezStatsProvider =
-    StreamProvider.family<Map<String, dynamic>, String>(
+    StreamProvider.autoDispose.family<Map<String, dynamic>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('users')

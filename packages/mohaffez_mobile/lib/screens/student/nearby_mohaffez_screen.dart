@@ -46,6 +46,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   bool distanceFilterEnabled = true;
   String searchQuery = '';
   String? selectedSpecialization;
+  String? selectedTeachingService;
+  String? selectedLearnerLevel;
+  String? selectedTeachingLanguage;
   MohaffezModel? _selectedTeacher;
   List<MohaffezModel> _lastTeachers = const [];
   bool _hasLoadedTeachers = false;
@@ -161,6 +164,43 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       );
     }
 
+    final activeProfileAsync = ref.watch(activeStudentProfileProvider);
+    final activeProfile = activeProfileAsync.valueOrNull;
+    final config = ref.watch(systemConfigProvider).valueOrNull ??
+        SystemConfigModel.defaults();
+    final requiredAgeGroup = TeacherDiscoveryTaxonomy.ageGroupForAge(
+      activeProfile?.age,
+      childrenMaxAge: config.discoveryChildrenMaxAge,
+      teenMaxAge: config.discoveryTeenMaxAge,
+    );
+    final requiredLearnerGender = activeProfile?.gender?.trim().toLowerCase();
+    final hasValidLearnerGender =
+        requiredLearnerGender == 'male' || requiredLearnerGender == 'female';
+    if (config.discoveryAudienceMatchingEnabled &&
+        (activeProfileAsync.isLoading ||
+            activeProfile == null ||
+            requiredAgeGroup == null ||
+            !hasValidLearnerGender)) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: activeProfileAsync.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildMissingLearnerData(context),
+        ),
+      );
+    }
+    final suggestedLearnerLevel =
+        TeacherDiscoveryTaxonomy.normalizeLevel(activeProfile?.level);
+    final localeLanguage = Localizations.localeOf(context).languageCode;
+    final suggestedTeachingLanguage = TeacherDiscoveryTaxonomy.find(
+              TeacherDiscoveryTaxonomy.languages,
+              localeLanguage,
+            ) !=
+            null
+        ? localeLanguage
+        : 'ar';
+
     final params = NearbyParams(
       userLat: userLat,
       userLng: userLng,
@@ -169,6 +209,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       sortBy: selectedFilter,
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
+      teachingService: selectedTeachingService,
+      requiredLearnerAgeGroup: requiredAgeGroup,
+      requiredLearnerGender:
+          hasValidLearnerGender ? requiredLearnerGender : null,
+      enforceAudienceMatching: config.discoveryAudienceMatchingEnabled,
+      allowIncompleteTeacherAudience: config.allowIncompleteTeacherAudience,
+      learnerLevel: selectedLearnerLevel,
+      teachingLanguage: selectedTeachingLanguage,
+      suggestedTeachingService: selectedTeachingService,
+      suggestedLearnerLevel: suggestedLearnerLevel,
+      suggestedTeachingLanguage: suggestedTeachingLanguage,
       availabilityFilter: availabilityFilter,
       genderFilter: genderFilter,
       trialSessionFilter: trialSessionFilter,
@@ -752,6 +803,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         children: [
           _buildSearchBar(),
           _buildGuidedModeBanner(),
+          _buildSmartMatchBanner(),
           _buildFilterRail(),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
@@ -814,10 +866,16 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           ),
           Expanded(
             child: teachers.isEmpty && !isLoadingLocation
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.travel_explore,
-                    title: 'لا يوجد محفظون',
-                    message: 'لم نتمكن من العثور على محفظين في نطاق البحث',
+                    title: 'لا توجد نتائج مطابقة',
+                    message:
+                        'جرّب توسيع اللغة أو المستوى أو المسافة. العمر والنوع يُطابقان تلقائيًا.',
+                    action: TextButton.icon(
+                      onPressed: _clearDiscoveryFilters,
+                      icon: const Icon(Icons.filter_alt_off_rounded),
+                      label: const Text('مسح فلاتر المطابقة'),
+                    ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
@@ -1122,6 +1180,106 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     );
   }
 
+  Widget _buildSmartMatchBanner() {
+    final profile = ref.watch(activeStudentProfileProvider).valueOrNull;
+    final config = ref.watch(systemConfigProvider).valueOrNull ??
+        SystemConfigModel.defaults();
+    if (profile == null || !config.discoveryAudienceMatchingEnabled) {
+      return const SizedBox.shrink();
+    }
+    final labels = <String>[
+      if (TeacherDiscoveryTaxonomy.ageGroupForAge(
+        profile.age,
+        childrenMaxAge: config.discoveryChildrenMaxAge,
+        teenMaxAge: config.discoveryTeenMaxAge,
+      )
+          case final id?)
+        TeacherDiscoveryTaxonomy.label(
+          TeacherDiscoveryTaxonomy.ageGroups,
+          id,
+        ),
+      if (profile.gender case final gender?
+          when gender == 'male' || gender == 'female')
+        TeacherDiscoveryTaxonomy.label(
+          TeacherDiscoveryTaxonomy.learnerGenders,
+          gender,
+        ),
+    ];
+    if (labels.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.auto_awesome_rounded,
+            size: 17,
+            color: AppThemeConstants.primary,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              'تظهر فقط النتائج المناسبة لـ ${labels.join(' · ')}. تُحدّث المطابقة تلقائيًا عند تبديل الطالب.',
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: AppThemeConstants.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissingLearnerData(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.manage_accounts_rounded,
+                  size: 58,
+                  color: AppThemeConstants.primary,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'أكمل بيانات الطالب أولًا',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppThemeConstants.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'نحتاج تاريخ الميلاد والنوع لعرض المحفّظين المناسبين بأمان.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppThemeConstants.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () => context.push('/student-profiles'),
+                  icon: const Icon(Icons.edit_rounded),
+                  label: const Text('إكمال بيانات الطالب'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterRail() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -1192,6 +1350,36 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     label: selectedSpecialization!,
                   ),
                 ],
+                if (selectedTeachingService != null) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: Icons.menu_book_rounded,
+                    label: TeacherDiscoveryTaxonomy.label(
+                      TeacherDiscoveryTaxonomy.services,
+                      selectedTeachingService!,
+                    ),
+                  ),
+                ],
+                if (selectedTeachingLanguage != null) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: Icons.translate_rounded,
+                    label: TeacherDiscoveryTaxonomy.label(
+                      TeacherDiscoveryTaxonomy.languages,
+                      selectedTeachingLanguage!,
+                    ),
+                  ),
+                ],
+                if (selectedLearnerLevel != null) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: Icons.stairs_rounded,
+                    label: TeacherDiscoveryTaxonomy.label(
+                      TeacherDiscoveryTaxonomy.levels,
+                      selectedLearnerLevel!,
+                    ),
+                  ),
+                ],
                 if (_mapAllowed) ...[
                   const SizedBox(width: 8),
                   _ActiveFilterPill(
@@ -1215,6 +1403,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     var tempTrialSessionFilter = trialSessionFilter;
     var tempSessionTypeFilter = sessionTypeFilter;
     var tempSpecialization = selectedSpecialization;
+    var tempTeachingService = selectedTeachingService;
+    var tempLearnerLevel = selectedLearnerLevel;
+    var tempTeachingLanguage = selectedTeachingLanguage;
     var tempRadius = radiusKm;
     var tempDistanceFilterEnabled = distanceFilterEnabled;
 
@@ -1434,42 +1625,36 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                 ],
                               ),
                             ],
-                            if (SpecializationConstants
-                                .specializations.isNotEmpty) ...[
-                              const SizedBox(height: 18),
-                              const _SheetSectionTitle(
-                                icon: Icons.auto_awesome_rounded,
-                                title: 'التخصص',
+                            const SizedBox(height: 18),
+                            _DiscoveryFilterGroup(
+                              title: 'نوع التدريس',
+                              icon: Icons.menu_book_rounded,
+                              options: TeacherDiscoveryTaxonomy.services,
+                              selectedId: tempTeachingService,
+                              onChanged: (value) => setSheetState(
+                                () => tempTeachingService = value,
                               ),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _FilterOptionChip(
-                                    label: 'كل التخصصات',
-                                    icon: Icons.apps_rounded,
-                                    isSelected: tempSpecialization == null,
-                                    onTap: () => setSheetState(() {
-                                      tempSpecialization = null;
-                                    }),
-                                  ),
-                                  ...SpecializationConstants.specializations
-                                      .map(
-                                    (spec) => _FilterOptionChip(
-                                      label: spec,
-                                      icon: Icons.auto_awesome_rounded,
-                                      isSelected: tempSpecialization == spec,
-                                      onTap: () => setSheetState(() {
-                                        tempSpecialization =
-                                            tempSpecialization == spec
-                                                ? null
-                                                : spec;
-                                      }),
-                                    ),
-                                  ),
-                                ],
+                            ),
+                            const SizedBox(height: 18),
+                            _DiscoveryFilterGroup(
+                              title: 'لغة التدريس',
+                              icon: Icons.translate_rounded,
+                              options: TeacherDiscoveryTaxonomy.languages,
+                              selectedId: tempTeachingLanguage,
+                              onChanged: (value) => setSheetState(
+                                () => tempTeachingLanguage = value,
                               ),
-                            ],
+                            ),
+                            const SizedBox(height: 18),
+                            _DiscoveryFilterGroup(
+                              title: 'مستوى الطالب',
+                              icon: Icons.stairs_rounded,
+                              options: TeacherDiscoveryTaxonomy.levels,
+                              selectedId: tempLearnerLevel,
+                              onChanged: (value) => setSheetState(
+                                () => tempLearnerLevel = value,
+                              ),
+                            ),
                             if (_mapAllowed) ...[
                               const SizedBox(height: 18),
                               const _SheetSectionTitle(
@@ -1586,6 +1771,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   TeacherTrialSessionFilter.all;
                               tempSessionTypeFilter = sessionTypeFilter;
                               tempSpecialization = null;
+                              tempTeachingService = null;
+                              tempTeachingLanguage = null;
+                              tempLearnerLevel = null;
                               tempRadius = 50;
                               tempDistanceFilterEnabled = _mapAllowed;
                             }),
@@ -1602,6 +1790,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   trialSession: tempTrialSessionFilter,
                                   sessionType: sessionTypeFilter,
                                   specialization: tempSpecialization,
+                                  teachingService: tempTeachingService,
+                                  learnerLevel: tempLearnerLevel,
+                                  teachingLanguage: tempTeachingLanguage,
                                   radius: tempRadius,
                                   distanceEnabled: _mapAllowed
                                       ? tempDistanceFilterEnabled
@@ -1717,6 +1908,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     if (availabilityFilter != TeacherAvailabilityFilter.availableOnly) count++;
     if (trialSessionFilter != TeacherTrialSessionFilter.all) count++;
     if (selectedSpecialization != null) count++;
+    if (selectedTeachingService != null) count++;
+    if (selectedTeachingLanguage != null) count++;
+    if (selectedLearnerLevel != null) count++;
     if (_mapAllowed && (!distanceFilterEnabled || radiusKm.round() != 50)) {
       count++;
     }
@@ -1766,6 +1960,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     required TeacherTrialSessionFilter trialSession,
     required TeacherSessionTypeFilter sessionType,
     required String? specialization,
+    required String? teachingService,
+    required String? learnerLevel,
+    required String? teachingLanguage,
     required double radius,
     required bool distanceEnabled,
   }) {
@@ -1777,6 +1974,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       trialSessionFilter = trialSession;
       sessionTypeFilter = sessionType;
       selectedSpecialization = specialization;
+      selectedTeachingService = teachingService;
+      selectedLearnerLevel = learnerLevel;
+      selectedTeachingLanguage = teachingLanguage;
       radiusKm = normalizedRadius;
       distanceFilterEnabled = distanceEnabled;
       if (sessionType == TeacherSessionTypeFilter.online &&
@@ -1793,6 +1993,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     _searchController.clear();
     setState(() {
       searchQuery = '';
+      _selectedTeacher = null;
+      _hasFitInitialBounds = false;
+    });
+  }
+
+  void _clearDiscoveryFilters() {
+    setState(() {
+      selectedTeachingService = null;
+      selectedTeachingLanguage = null;
+      selectedLearnerLevel = null;
+      selectedSpecialization = null;
       _selectedTeacher = null;
       _hasFitInitialBounds = false;
     });
@@ -2143,6 +2354,17 @@ class _MapTeacherPreviewCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (teacher.discoveryBadges().isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: teacher
+                            .discoveryBadges()
+                            .map((label) => _DiscoveryBadge(label: label))
+                            .toList(growable: false),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2161,7 +2383,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
             children: [
               _MetricPill(
                 icon: Icons.star_rounded,
-                label: teacher.rating.toStringAsFixed(1),
+                label: teacher.ratingLabel,
                 color: AppThemeConstants.secondary,
               ),
               _MetricPill(
@@ -2317,6 +2539,17 @@ class _TeacherPreviewCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                    if (teacher.discoveryBadges().isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: teacher
+                            .discoveryBadges()
+                            .map((label) => _DiscoveryBadge(label: label))
+                            .toList(growable: false),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
@@ -2324,7 +2557,7 @@ class _TeacherPreviewCard extends StatelessWidget {
                       children: [
                         _MetricPill(
                           icon: Icons.star_rounded,
-                          label: teacher.rating.toStringAsFixed(1),
+                          label: teacher.ratingLabel,
                           color: AppThemeConstants.secondary,
                         ),
                         _MetricPill(
@@ -2481,6 +2714,17 @@ class _TeacherResultTile extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (teacher.discoveryBadges().isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: teacher
+                            .discoveryBadges()
+                            .map((label) => _DiscoveryBadge(label: label))
+                            .toList(growable: false),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
@@ -2488,7 +2732,7 @@ class _TeacherResultTile extends StatelessWidget {
                       children: [
                         _MetricPill(
                           icon: Icons.star_rounded,
-                          label: teacher.rating.toStringAsFixed(1),
+                          label: teacher.ratingLabel,
                           color: AppThemeConstants.secondary,
                         ),
                         if (distance != null)
@@ -2530,6 +2774,34 @@ class _TeacherResultTile extends StatelessWidget {
 }
 
 // ─── Shared sub-widgets ──────────────────────────────────────────────────────
+
+class _DiscoveryBadge extends StatelessWidget {
+  final String label;
+
+  const _DiscoveryBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppThemeConstants.primary.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppThemeConstants.primary,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
 
 class _MetricPill extends StatelessWidget {
   final IconData icon;
@@ -2726,6 +2998,55 @@ class _ActiveFilterPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DiscoveryFilterGroup extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<TeacherDiscoveryOption> options;
+  final String? selectedId;
+  final ValueChanged<String?> onChanged;
+
+  const _DiscoveryFilterGroup({
+    required this.title,
+    required this.icon,
+    required this.options,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SheetSectionTitle(icon: icon, title: title),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _FilterOptionChip(
+              label: 'الكل',
+              icon: Icons.apps_rounded,
+              isSelected: selectedId == null,
+              onTap: () => onChanged(null),
+            ),
+            ...options.map(
+              (option) => _FilterOptionChip(
+                label: option.labelAr,
+                icon: icon,
+                isSelected: selectedId == option.id,
+                onTap: () => onChanged(
+                  selectedId == option.id ? null : option.id,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

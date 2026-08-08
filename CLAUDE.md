@@ -166,8 +166,10 @@ Models and Riverpod providers live in `mohaffez_core` and are imported by both `
 | `promoCodes` | Promo code definitions |
 
 Key Firestore field names (session rating pipeline — must match security rules):
-- Student submits rating → writes `teacherRating` (int) and `reviewNotes` (string) to `hafizSessions`
-- Cloud Function `onSessionCompleted` triggers on `teacherRating` write → updates teacher's `rating` average on `users/{mohaffezId}`
+- Student submits feedback → writes `teacherRating` (int), `teacherRatingScale` (5), `technicalIssueSource`, optional `teacherRatingReason`, and `reviewNotes` to `hafizSessions`
+- Cloud Function `onTeacherRated` counts only explicit five-point V2 ratings and updates the teacher's `rating` average on `users/{mohaffezId}`
+- `teacherRatingReason == 'technical_only'` is retained for support review but excluded from the public average
+- Public reputation requires `ratingPolicyVersion == 2`; legacy session ratings remain admin-visible but are excluded. Use `docs/RATING_V2_MIGRATION.md` for the dry-run-first rebuild.
 
 ### Cloud Functions (`functions/src/`)
 

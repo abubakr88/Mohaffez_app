@@ -1,4 +1,4 @@
-﻿// lib/screens/active_subscriptions_screen.dart
+// lib/screens/active_subscriptions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,14 +41,16 @@ class _ActiveSubscriptionsScreenState
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
     return userAsync.when(
-      loading: () => const Scaffold(
-          body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => const Scaffold(
           body: Center(
-              child: Text('حدث خطأ في تحميل البيانات. يرجى المحاولة مرة أخرى.'))),
+              child:
+                  Text('حدث خطأ في تحميل البيانات. يرجى المحاولة مرة أخرى.'))),
       data: (user) {
         if (user == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/login'));
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => context.go('/login'));
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -68,9 +70,7 @@ class _ActiveSubscriptionsScreenState
                 labelColor: AppThemeConstants.surface,
                 unselectedLabelColor:
                     AppThemeConstants.surface.withValues(alpha: 0.6),
-                tabs: _kTabs
-                    .map((t) => Tab(text: t.label))
-                    .toList(),
+                tabs: _kTabs.map((t) => Tab(text: t.label)).toList(),
               ),
             ),
             body: TabBarView(
@@ -92,26 +92,24 @@ class _ActiveSubscriptionsScreenState
 class _SubscriptionTabView extends ConsumerWidget {
   final String studentId;
   final String status;
-  const _SubscriptionTabView(
-      {required this.studentId, required this.status});
+  const _SubscriptionTabView({required this.studentId, required this.status});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subsAsync = ref.watch(
-      filteredSubscriptionsProvider(
-          (studentId: studentId, status: status)),
+      filteredSubscriptionsProvider((studentId: studentId, status: status)),
     );
 
     Future<void> onRefresh() async {
       ref.invalidate(filteredSubscriptionsProvider(
           (studentId: studentId, status: status)));
-      await ref.read(filteredSubscriptionsProvider(
-              (studentId: studentId, status: status)).future);
+      await ref.read(
+          filteredSubscriptionsProvider((studentId: studentId, status: status))
+              .future);
     }
 
     return subsAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => const Center(
           child: Text('حدث خطأ في تحميل الاشتراكات. يرجى المحاولة مرة أخرى.')),
       data: (subs) {
@@ -126,8 +124,7 @@ class _SubscriptionTabView extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   itemCount: subs.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) =>
-                      _SubscriptionCard(sub: subs[i]),
+                  itemBuilder: (_, i) => _SubscriptionCard(sub: subs[i]),
                 ),
         );
       },
@@ -135,7 +132,7 @@ class _SubscriptionTabView extends ConsumerWidget {
   }
 }
 
-class _SubscriptionCard extends StatelessWidget {
+class _SubscriptionCard extends ConsumerWidget {
   final SubscriptionModel sub;
   const _SubscriptionCard({required this.sub});
 
@@ -175,7 +172,7 @@ class _SubscriptionCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       elevation: 0,
       color: AppThemeConstants.surface,
@@ -236,8 +233,7 @@ class _SubscriptionCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: sub.progressPercentage,
                 backgroundColor: AppThemeConstants.divider,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(_progressColor),
+                valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
                 minHeight: 8,
               ),
             ),
@@ -270,9 +266,26 @@ class _SubscriptionCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => context.push(
-                    '/mohaffez/${sub.mohaffezId}',
-                  ),
+                  onPressed: () async {
+                    final subscriptionId = sub.id;
+                    if (subscriptionId == null || subscriptionId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'تعذر تحديد الباقة. يرجى تحديث الصفحة والمحاولة مرة أخرى.'),
+                          backgroundColor: AppThemeConstants.error,
+                        ),
+                      );
+                      return;
+                    }
+                    ref.read(bookingFlowProvider.notifier).reset();
+                    await context.push(
+                      '/mohaffez/${sub.mohaffezId}?subscriptionId=${Uri.encodeQueryComponent(subscriptionId)}',
+                    );
+                    if (context.mounted) {
+                      ref.read(bookingFlowProvider.notifier).reset();
+                    }
+                  },
                   icon: const Icon(Icons.book_online_outlined, size: 18),
                   label: const Text('احجز جلسة'),
                   style: ElevatedButton.styleFrom(

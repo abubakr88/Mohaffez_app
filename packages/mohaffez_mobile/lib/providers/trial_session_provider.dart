@@ -129,6 +129,7 @@ class TrialSessionActions extends StateNotifier<AsyncValue<void>> {
     required String sessionType,
     String? preferredProvider,
     required List<Map<String, String>> availabilityWindows,
+    required Map<String, dynamic> studentPreparation,
     Map<String, dynamic> learnerSnapshot = const {},
   }) {
     return _call('createTrialSessionRequest', {
@@ -137,6 +138,7 @@ class TrialSessionActions extends StateNotifier<AsyncValue<void>> {
       if (sessionType == 'online' && preferredProvider != null)
         'preferredProvider': preferredProvider,
       'availabilityWindows': availabilityWindows,
+      'studentPreparation': studentPreparation,
       'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
       ...learnerSnapshot,
     });

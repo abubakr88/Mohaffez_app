@@ -10,7 +10,8 @@ final pricingRepositoryProvider = Provider<PricingRepository>((ref) {
 });
 
 // Plans stream providers (already exist)
-final pricingPlansProvider = StreamProvider.family<List<PricingPlanModel>, String>((ref, mohaffezId) {
+final pricingPlansProvider = StreamProvider.autoDispose
+    .family<List<PricingPlanModel>, String>((ref, mohaffezId) {
   final authAsync = ref.watch(authStateProvider);
   if (authAsync.isLoading || authAsync.value == null) {
     return const Stream.empty();
@@ -20,7 +21,8 @@ final pricingPlansProvider = StreamProvider.family<List<PricingPlanModel>, Strin
   return repository.watchMohaffezPlans(mohaffezId);
 });
 
-final activePricingPlansProvider = StreamProvider.family<List<PricingPlanModel>, String>((ref, mohaffezId) {
+final activePricingPlansProvider = StreamProvider.autoDispose
+    .family<List<PricingPlanModel>, String>((ref, mohaffezId) {
   final authAsync = ref.watch(authStateProvider);
   if (authAsync.isLoading || authAsync.value == null) {
     return const Stream.empty();
@@ -31,7 +33,8 @@ final activePricingPlansProvider = StreamProvider.family<List<PricingPlanModel>,
 });
 
 // **ADD THIS: Actions Provider (StateNotifierProvider)**
-final pricingActionsProvider = StateNotifierProvider<PricingActionsNotifier, AsyncValue<void>>((ref) {
+final pricingActionsProvider =
+    StateNotifierProvider<PricingActionsNotifier, AsyncValue<void>>((ref) {
   return PricingActionsNotifier(ref);
 });
 
@@ -74,10 +77,13 @@ class PricingActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> updatePlanStatus(String mohaffezId, String planId, bool isActive) async {
+  Future<void> updatePlanStatus(
+      String mohaffezId, String planId, bool isActive) async {
     state = const AsyncValue.loading();
     try {
-      await ref.read(pricingRepositoryProvider).togglePlanStatus(mohaffezId, planId, isActive);
+      await ref
+          .read(pricingRepositoryProvider)
+          .togglePlanStatus(mohaffezId, planId, isActive);
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
