@@ -1,4 +1,4 @@
-﻿// lib/screens/teacher_certificates_screen.dart
+// lib/screens/teacher_certificates_screen.dart
 //
 // Step 3 of mohaffez registration: upload certificates then submit for approval.
 // Reached after passing the exam (exam_result_screen passes score ≥ passing).
@@ -15,21 +15,22 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/credential_service.dart';
+import '../../shared/widgets/teacher_discovery_editor.dart';
 
 // ─── Design tokens (matching app teal theme) ─────────────────────────────────
 class _DS {
   static const teal800 = Color(0xFF095752);
   static const teal700 = Color(0xFF0C6F6A);
   static const teal500 = Color(0xFF1A9E84);
-  static const teal50  = Color(0xFFEAF6F3);
-  static const amber   = Color(0xFFE67E22);
+  static const teal50 = Color(0xFFEAF6F3);
+  static const amber = Color(0xFFE67E22);
   static const amberBg = Color(0xFFFFF3E0);
-  static const text1   = Color(0xFF111827);
-  static const text2   = Color(0xFF4B5563);
-  static const border  = Color(0xFFE5EDE9);
-  static const bg      = Color(0xFFF4F7F6);
-  static const r12     = BorderRadius.all(Radius.circular(12));
-  static const r16     = BorderRadius.all(Radius.circular(16));
+  static const text1 = Color(0xFF111827);
+  static const text2 = Color(0xFF4B5563);
+  static const border = Color(0xFFE5EDE9);
+  static const bg = Color(0xFFF4F7F6);
+  static const r12 = BorderRadius.all(Radius.circular(12));
+  static const r16 = BorderRadius.all(Radius.circular(16));
 }
 
 class TeacherCertificatesScreen extends ConsumerStatefulWidget {
@@ -43,16 +44,24 @@ class TeacherCertificatesScreen extends ConsumerStatefulWidget {
 class _TeacherCertificatesScreenState
     extends ConsumerState<TeacherCertificatesScreen> {
   // ─── Certificate form ─────────────────────────────────────────────────────
-  final _titleController          = TextEditingController();
-  final _organizationController   = TextEditingController();
-  final _bioController            = TextEditingController();
+  final _titleController = TextEditingController();
+  final _organizationController = TextEditingController();
+  final _bioController = TextEditingController();
   final _specializationController = TextEditingController();
-  final _videoUrlController       = TextEditingController();
+  final _videoUrlController = TextEditingController();
+
+  TeacherDiscoverySelection _discoverySelection =
+      const TeacherDiscoverySelection(
+    languages: {'ar'},
+    primaryLanguage: 'ar',
+  );
+  bool _showDiscoveryValidation = false;
 
   final List<_CertEntry> _certificates = [];
   bool _submitting = false;
 
-  Widget _specializationChip({required String label, required VoidCallback onTap}) {
+  Widget _specializationChip(
+      {required String label, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -87,7 +96,7 @@ class _TeacherCertificatesScreenState
   // ─── Add certificate dialog ───────────────────────────────────────────────
   Future<void> _showAddCertDialog() async {
     final titleCtrl = TextEditingController();
-    final orgCtrl   = TextEditingController();
+    final orgCtrl = TextEditingController();
     final List<XFile> picked = [];
     DateTime? issueDate;
 
@@ -103,7 +112,9 @@ class _TeacherCertificatesScreenState
           textDirection: TextDirection.rtl,
           child: Padding(
             padding: EdgeInsets.only(
-              top: 24, left: 20, right: 20,
+              top: 24,
+              left: 20,
+              right: 20,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
             ),
             child: Column(
@@ -113,9 +124,11 @@ class _TeacherCertificatesScreenState
                 Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: const BoxDecoration(
-                        color: _DS.teal50, shape: BoxShape.circle,
+                        color: _DS.teal50,
+                        shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.workspace_premium_rounded,
                           color: _DS.teal500, size: 22),
@@ -123,7 +136,8 @@ class _TeacherCertificatesScreenState
                     const SizedBox(width: 12),
                     const Text('إضافة شهادة / مؤهل',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
                             color: _DS.text1)),
                   ],
                 ),
@@ -134,7 +148,8 @@ class _TeacherCertificatesScreenState
                   decoration: const InputDecoration(
                     labelText: 'اسم الشهادة *',
                     border: OutlineInputBorder(borderRadius: _DS.r12),
-                    filled: true, fillColor: _DS.bg,
+                    filled: true,
+                    fillColor: _DS.bg,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -144,7 +159,8 @@ class _TeacherCertificatesScreenState
                   decoration: const InputDecoration(
                     labelText: 'الجهة المانحة *',
                     border: OutlineInputBorder(borderRadius: _DS.r12),
-                    filled: true, fillColor: _DS.bg,
+                    filled: true,
+                    fillColor: _DS.bg,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -177,9 +193,7 @@ class _TeacherCertificatesScreenState
                               ? 'تاريخ الإصدار *'
                               : '${issueDate!.year}/${issueDate!.month}/${issueDate!.day}',
                           style: TextStyle(
-                            color: issueDate == null
-                                ? _DS.text2
-                                : _DS.text1,
+                            color: issueDate == null ? _DS.text2 : _DS.text1,
                           ),
                         ),
                       ],
@@ -205,8 +219,7 @@ class _TeacherCertificatesScreenState
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _DS.teal500,
                     side: const BorderSide(color: _DS.teal500),
-                    shape: const RoundedRectangleBorder(
-                        borderRadius: _DS.r12),
+                    shape: const RoundedRectangleBorder(borderRadius: _DS.r12),
                     padding: const EdgeInsets.symmetric(
                         vertical: 12, horizontal: 16),
                   ),
@@ -222,8 +235,7 @@ class _TeacherCertificatesScreenState
                           issueDate == null) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           const SnackBar(
-                              content:
-                                  Text('يرجى ملء الحقول المطلوبة (*)'),
+                              content: Text('يرجى ملء الحقول المطلوبة (*)'),
                               backgroundColor: AppThemeConstants.error),
                         );
                         return;
@@ -241,8 +253,8 @@ class _TeacherCertificatesScreenState
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _DS.teal700,
                       foregroundColor: AppThemeConstants.white,
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: _DS.r12),
+                      shape:
+                          const RoundedRectangleBorder(borderRadius: _DS.r12),
                     ),
                     child: const Text('إضافة',
                         style: TextStyle(
@@ -264,6 +276,12 @@ class _TeacherCertificatesScreenState
       _snack('يرجى كتابة نبذة تعريفية');
       return;
     }
+    final discoveryError = _discoverySelection.validationMessage;
+    if (discoveryError != null) {
+      setState(() => _showDiscoveryValidation = true);
+      _snack(discoveryError);
+      return;
+    }
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
@@ -275,8 +293,8 @@ class _TeacherCertificatesScreenState
     try {
       // 1 — Upload each certificate via CredentialService
       for (final cert in _certificates) {
-        final urls = await CredentialService.uploadCredentialImages(
-            cert.images, uid);
+        final urls =
+            await CredentialService.uploadCredentialImages(cert.images, uid);
         await CredentialService.addCredential(
           type: 'academic',
           title: cert.title,
@@ -295,6 +313,7 @@ class _TeacherCertificatesScreenState
         'youtubeVideoUrl': _videoUrlController.text.trim().isEmpty
             ? null
             : _videoUrlController.text.trim(),
+        ..._discoverySelection.toFirestore(),
         'status': 'pending_approval',
         'setupCompleted': true,
         'approvalSubmittedAt': FieldValue.serverTimestamp(),
@@ -354,15 +373,15 @@ class _TeacherCertificatesScreenState
                       ),
                       child: SafeArea(
                         child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
                                   Container(
-                                    width: 44, height: 44,
+                                    width: 44,
+                                    height: 44,
                                     decoration: BoxDecoration(
                                       color: AppThemeConstants.white
                                           .withValues(alpha: 0.15),
@@ -370,7 +389,8 @@ class _TeacherCertificatesScreenState
                                     ),
                                     child: const Icon(
                                         Icons.workspace_premium_rounded,
-                                        color: AppThemeConstants.white, size: 24),
+                                        color: AppThemeConstants.white,
+                                        size: 24),
                                   ),
                                   const SizedBox(width: 12),
                                   const Expanded(
@@ -382,13 +402,15 @@ class _TeacherCertificatesScreenState
                                             style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.w800,
-                                                color: AppThemeConstants.white)),
+                                                color:
+                                                    AppThemeConstants.white)),
                                         SizedBox(height: 4),
                                         Text(
                                             'أضف نبذتك وشهاداتك ثم أرسل طلب الانضمام',
                                             style: TextStyle(
                                                 fontSize: 13,
-                                                color: AppThemeConstants.white70)),
+                                                color:
+                                                    AppThemeConstants.white70)),
                                       ],
                                     ),
                                   ),
@@ -421,8 +443,7 @@ class _TeacherCertificatesScreenState
                           decoration: const InputDecoration(
                             hintText:
                                 'اكتب نبذة تعريفية عن خبرتك في تحفيظ القرآن الكريم...',
-                            border: OutlineInputBorder(
-                                borderRadius: _DS.r12),
+                            border: OutlineInputBorder(borderRadius: _DS.r12),
                             filled: true,
                             fillColor: _DS.bg,
                           ),
@@ -443,8 +464,8 @@ class _TeacherCertificatesScreenState
                               decoration: const InputDecoration(
                                 hintText:
                                     'مثال: حفظ القرآن، تجويد، قراءات عشر...',
-                                border: OutlineInputBorder(
-                                    borderRadius: _DS.r12),
+                                border:
+                                    OutlineInputBorder(borderRadius: _DS.r12),
                                 filled: true,
                                 fillColor: _DS.bg,
                               ),
@@ -467,10 +488,13 @@ class _TeacherCertificatesScreenState
                                         label: spec,
                                         onTap: () {
                                           final currentText =
-                                              _specializationController.text.trim();
+                                              _specializationController.text
+                                                  .trim();
                                           if (currentText.isEmpty) {
-                                            _specializationController.text = spec;
-                                          } else if (!currentText.contains(spec)) {
+                                            _specializationController.text =
+                                                spec;
+                                          } else if (!currentText
+                                              .contains(spec)) {
                                             _specializationController.text =
                                                 '$currentText، $spec';
                                           }
@@ -479,6 +503,24 @@ class _TeacherCertificatesScreenState
                                   .toList(),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      _SectionCard(
+                        title: 'التدريس والطلاب واللغات',
+                        icon: Icons.manage_search_rounded,
+                        child: TeacherDiscoveryEditor(
+                          initialValue: _discoverySelection,
+                          showValidationHint: _showDiscoveryValidation,
+                          onChanged: (value) {
+                            _discoverySelection = value;
+                            if (_showDiscoveryValidation && value.isComplete) {
+                              setState(
+                                () => _showDiscoveryValidation = false,
+                              );
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -494,12 +536,11 @@ class _TeacherCertificatesScreenState
                           decoration: const InputDecoration(
                             hintText: 'https://youtube.com/...',
                             hintTextDirection: TextDirection.ltr,
-                            border: OutlineInputBorder(
-                                borderRadius: _DS.r12),
+                            border: OutlineInputBorder(borderRadius: _DS.r12),
                             filled: true,
                             fillColor: _DS.bg,
-                            prefixIcon: Icon(Icons.link_rounded,
-                                color: _DS.teal500),
+                            prefixIcon:
+                                Icon(Icons.link_rounded, color: _DS.teal500),
                           ),
                         ),
                       ),
@@ -526,9 +567,8 @@ class _TeacherCertificatesScreenState
                                     .entries
                                     .map((e) => _CertTile(
                                           cert: e.value,
-                                          onRemove: () => setState(
-                                              () => _certificates
-                                                  .removeAt(e.key)),
+                                          onRemove: () => setState(() =>
+                                              _certificates.removeAt(e.key)),
                                         ))
                                     .toList(),
                               ),
@@ -579,14 +619,14 @@ class _TeacherCertificatesScreenState
                           ),
                           child: _submitting
                               ? const SizedBox(
-                                  width: 24, height: 24,
+                                  width: 24,
+                                  height: 24,
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
                                       color: AppThemeConstants.white),
                                 )
                               : const Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(Icons.send_rounded, size: 20),
                                     SizedBox(width: 8),
@@ -653,7 +693,8 @@ class _StepIndicator extends StatelessWidget {
               ),
               if (current)
                 Container(
-                  width: 20, height: 20,
+                  width: 20,
+                  height: 20,
                   margin: const EdgeInsets.only(right: 6),
                   decoration: const BoxDecoration(
                       color: AppThemeConstants.white, shape: BoxShape.circle),
@@ -741,7 +782,8 @@ class _EmptyHint extends StatelessWidget {
         decoration: BoxDecoration(
           color: _DS.teal50,
           borderRadius: _DS.r12,
-          border: Border.all(color: _DS.teal500.withValues(alpha: 0.3),
+          border: Border.all(
+              color: _DS.teal500.withValues(alpha: 0.3),
               style: BorderStyle.solid),
         ),
         child: const Column(
@@ -750,8 +792,7 @@ class _EmptyHint extends StatelessWidget {
                 size: 32, color: _DS.teal500),
             SizedBox(height: 8),
             Text('اضغط لإضافة شهادة أو مؤهل',
-                style:
-                    TextStyle(fontSize: 14, color: _DS.teal500)),
+                style: TextStyle(fontSize: 14, color: _DS.teal500)),
           ],
         ),
       ),
@@ -777,9 +818,10 @@ class _CertTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40, height: 40,
-            decoration: const BoxDecoration(
-                color: _DS.teal500, shape: BoxShape.circle),
+            width: 40,
+            height: 40,
+            decoration:
+                const BoxDecoration(color: _DS.teal500, shape: BoxShape.circle),
             child: const Icon(Icons.workspace_premium_rounded,
                 color: AppThemeConstants.white, size: 20),
           ),
@@ -794,12 +836,10 @@ class _CertTile extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: _DS.text1)),
                 Text(cert.organization,
-                    style: const TextStyle(
-                        fontSize: 12, color: _DS.text2)),
+                    style: const TextStyle(fontSize: 12, color: _DS.text2)),
                 if (cert.images.isNotEmpty)
                   Text('${cert.images.length} صورة مرفقة',
-                      style: const TextStyle(
-                          fontSize: 11, color: _DS.teal500)),
+                      style: const TextStyle(fontSize: 11, color: _DS.teal500)),
               ],
             ),
           ),

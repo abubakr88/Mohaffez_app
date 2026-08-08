@@ -10,7 +10,12 @@ import '../../../design_system/design_system.dart';
 import 'admin_payment_formatters.dart';
 
 class AdminPaymentsPage extends ConsumerStatefulWidget {
-  const AdminPaymentsPage({super.key});
+  const AdminPaymentsPage({
+    super.key,
+    this.initialStatusFilter,
+  });
+
+  final String? initialStatusFilter;
 
   @override
   ConsumerState<AdminPaymentsPage> createState() => _AdminPaymentsPageState();
@@ -30,7 +35,16 @@ class _AdminPaymentsPageState extends ConsumerState<AdminPaymentsPage> {
   @override
   void initState() {
     super.initState();
+    _statusFilter = widget.initialStatusFilter;
     Future<void>.microtask(() => _loadPayments(reset: true));
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminPaymentsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialStatusFilter != widget.initialStatusFilter) {
+      _statusFilter = widget.initialStatusFilter;
+    }
   }
 
   Future<void> _loadPayments({required bool reset}) async {

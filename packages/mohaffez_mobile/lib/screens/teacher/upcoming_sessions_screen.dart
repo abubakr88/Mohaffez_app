@@ -1102,6 +1102,10 @@ class SessionCard extends ConsumerWidget {
                       '/complete-session/${session['id'] as String}',
                       extra: {
                         'studentName': studentName,
+                        'mohaffezId': mohaffezId,
+                        'studentId': studentId,
+                        'studentProfileId':
+                            session['studentProfileId'] as String?,
                         'previousHifz': previousAssignment['hifz'],
                         'previousMuraja': previousAssignment['muraja'],
                         'previousHifzFromAyah':
@@ -1161,6 +1165,10 @@ class SessionCard extends ConsumerWidget {
                             '/complete-session/${session['id'] as String}',
                             extra: {
                               'studentName': studentName,
+                              'mohaffezId': mohaffezId,
+                              'studentId': studentId,
+                              'studentProfileId':
+                                  session['studentProfileId'] as String?,
                               'previousHifz': previousAssignment['hifz'],
                               'previousMuraja': previousAssignment['muraja'],
                               'previousHifzFromAyah':

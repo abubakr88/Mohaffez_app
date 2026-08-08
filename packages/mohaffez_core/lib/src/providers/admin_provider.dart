@@ -315,7 +315,7 @@ bool _matchesAdminFilters(
 }
 
 final pendingCredentialsProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchPendingCredentials();
 });
 
@@ -475,7 +475,7 @@ final teacherStatsProvider = FutureProvider.autoDispose
 });
 
 final failedOperationsProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchFailedOperations();
 });
 
@@ -483,12 +483,13 @@ final failedOperationsProvider =
 // providers (activePayoutsProvider, notificationsFirstPageProvider,
 // unreadNotificationsCountProvider, notificationActionsProvider).
 
-final allPromoCodesProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final allPromoCodesProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchAllPromoCodes();
 });
 
 final activeSlotLocksProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchActiveSlotLocks();
 });
 

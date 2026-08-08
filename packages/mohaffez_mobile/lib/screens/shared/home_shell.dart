@@ -745,6 +745,7 @@ Widget _buildDrawer(
   required bool isDevModeActive,
   required UserModel user,
 }) {
+  final isStudent = normalizeRole(user.role) == roleStudent;
   return Drawer(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.only(
@@ -761,9 +762,9 @@ Widget _buildDrawer(
             children: [
               // ── Common ──────────────────────────────────────────────────
               _drawerTile(context,
-                  title: ArabicLabels.profile,
+                  title: isStudent ? 'ملف الطالب' : ArabicLabels.profile,
                   icon: Icons.person_rounded,
-                  route: 'profile',
+                  route: isStudent ? 'student-profiles' : 'profile',
                   color: _ShellDS.teal500),
               _drawerTile(context,
                   title: 'الإعدادات',

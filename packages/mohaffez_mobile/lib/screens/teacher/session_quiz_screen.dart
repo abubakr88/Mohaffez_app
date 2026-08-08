@@ -8,6 +8,7 @@ import 'quiz/games/complete_ayah_game.dart';
 import 'quiz/games/custom_questions_game.dart';
 import 'quiz/games/name_surah_game.dart';
 import 'quiz/games/order_ayahs_game.dart';
+import 'quiz/games/recitation_cards_game.dart';
 import 'quiz/games/tajweed_rule_game.dart';
 import 'quiz/state/quiz_session_controller.dart';
 import 'quiz/widgets/confetti_overlay.dart';
@@ -24,6 +25,7 @@ enum _GameMode {
   nameSurah,
   tajweedRule,
   orderAyahs,
+  recitationCards,
   customQuestions,
 }
 
@@ -31,14 +33,28 @@ class SessionQuizScreen extends ConsumerStatefulWidget {
   final String? studentName;
   final String? mohaffezId;
   final String? studentId;
+  final String? studentProfileId;
   final String? sessionId;
+  final String? previousHifz;
+  final String? previousMuraja;
+  final String? previousHifzFromAyah;
+  final String? previousHifzToAyah;
+  final String? previousMurajaFromAyah;
+  final String? previousMurajaToAyah;
 
   const SessionQuizScreen({
     super.key,
     this.studentName,
     this.mohaffezId,
     this.studentId,
+    this.studentProfileId,
     this.sessionId,
+    this.previousHifz,
+    this.previousMuraja,
+    this.previousHifzFromAyah,
+    this.previousHifzToAyah,
+    this.previousMurajaFromAyah,
+    this.previousMurajaToAyah,
   });
 
   @override
@@ -124,7 +140,8 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
                 const SizedBox(height: 12),
                 Text(
                   'أجبت ${s.correct} من ${s.asked} بشكل صحيح',
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563)),
+                  style:
+                      const TextStyle(fontSize: 14, color: Color(0xFF4B5563)),
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -176,11 +193,12 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
   }
 
   String get _title => switch (_mode) {
-        _GameMode.selector        => 'تحديات الجلسة',
-        _GameMode.completeAyah    => 'أكمل الآية',
-        _GameMode.nameSurah       => 'تحديد السورة',
-        _GameMode.tajweedRule     => 'أحكام التجويد',
-        _GameMode.orderAyahs      => 'ترتيب الآيات',
+        _GameMode.selector => 'تحديات الجلسة',
+        _GameMode.completeAyah => 'أكمل الآية',
+        _GameMode.nameSurah => 'تحديد السورة',
+        _GameMode.tajweedRule => 'أحكام التجويد',
+        _GameMode.orderAyahs => 'ترتيب الآيات',
+        _GameMode.recitationCards => 'كروت التسميع',
         _GameMode.customQuestions => 'تحديات المحفظ',
       };
 
@@ -191,31 +209,31 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
         if (didPop) _saveQuizResults();
       },
       child: Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: QuizBackground(
-          child: ConfettiOverlay(
-            controller: _confetti,
-            child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: KeyedSubtree(
-                    key: ValueKey(_mode),
-                    child: _buildBody(),
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: QuizBackground(
+            child: ConfettiOverlay(
+              controller: _confetti,
+              child: Column(
+                children: [
+                  _buildHeader(),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: KeyedSubtree(
+                        key: ValueKey(_mode),
+                        child: _buildBody(),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-        ),
-      ),
       ),
     );
   }
@@ -238,9 +256,11 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
           children: [
             // Decorative circles
             Positioned(
-              top: -30, left: -30,
+              top: -30,
+              left: -30,
               child: Container(
-                width: 120, height: 120,
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.06),
@@ -248,9 +268,11 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
               ),
             ),
             Positioned(
-              bottom: -20, right: 40,
+              bottom: -20,
+              right: 40,
               child: Container(
-                width: 80, height: 80,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withOpacity(0.05),
@@ -276,7 +298,8 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
                           }
                         },
                         child: Container(
-                          width: 38, height: 38,
+                          width: 38,
+                          height: 38,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.18),
                             borderRadius: BorderRadius.circular(12),
@@ -337,12 +360,14 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
         child: AnimatedBuilder(
           animation: _safeFloatController,
           builder: (_, __) {
-            final offset = Tween<double>(begin: 0, end: -6).animate(
-              CurvedAnimation(
-                parent: _safeFloatController,
-                curve: Interval(i * 0.2, 1.0, curve: Curves.easeInOut),
-              ),
-            ).value;
+            final offset = Tween<double>(begin: 0, end: -6)
+                .animate(
+                  CurvedAnimation(
+                    parent: _safeFloatController,
+                    curve: Interval(i * 0.2, 1.0, curve: Curves.easeInOut),
+                  ),
+                )
+                .value;
             return Transform.translate(
               offset: Offset(0, offset),
               child: Text(
@@ -390,6 +415,21 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
         return OrderAyahsGame(
           confetti: _confetti,
           onBackToMenu: _backToSelector,
+        );
+      case _GameMode.recitationCards:
+        return RecitationCardsGame(
+          confetti: _confetti,
+          onBackToMenu: _backToSelector,
+          previousHifz: widget.previousHifz,
+          previousMuraja: widget.previousMuraja,
+          previousHifzFromAyah: widget.previousHifzFromAyah,
+          previousHifzToAyah: widget.previousHifzToAyah,
+          previousMurajaFromAyah: widget.previousMurajaFromAyah,
+          previousMurajaToAyah: widget.previousMurajaToAyah,
+          sessionId: widget.sessionId,
+          mohaffezId: widget.mohaffezId,
+          studentId: widget.studentId,
+          studentProfileId: widget.studentProfileId,
         );
       case _GameMode.customQuestions:
         return CustomQuestionsGame(
@@ -505,6 +545,16 @@ class _KidsModeData {
 
 const _kidsModes = <_KidsModeData>[
   _KidsModeData(
+    emoji: '🃏',
+    title: 'كروت التسميع',
+    subtitle: 'اختر كرتًا وابدأ التسميع',
+    borderColor: Color(0xFFA7F3D0),
+    iconBg: Color(0xFFD1FAE5),
+    accentColor: Color(0xFF059669),
+    stars: 3,
+    mode: _GameMode.recitationCards,
+  ),
+  _KidsModeData(
     emoji: '📖',
     title: 'أكمل الآية',
     subtitle: 'أكمل الآية من أولها',
@@ -577,97 +627,98 @@ class _KidsSelector extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 680),
           child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section label
-          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 5, height: 22,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488),
-                  borderRadius: BorderRadius.circular(3),
+              // Section label
+              Row(
+                children: [
+                  Container(
+                    width: 5,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'اختر نوع التحدي',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF134E4A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Game grid — fixed tile size so columns grow on tablet / web
+              // instead of the two cards stretching huge.
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 240,
+                  mainAxisExtent: 196,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                ),
+                itemCount: _kidsModes.length,
+                itemBuilder: (_, i) => _KidsGameCard(
+                  data: _kidsModes[i],
+                  onTap: () => onSelect(_kidsModes[i].mode),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Text(
-                'اختر نوع التحدي',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF134E4A),
+              const SizedBox(height: 14),
+
+              // Custom challenges card
+              if (customCount > 0) ...[
+                _CustomChallengesCard(
+                  count: customCount,
+                  onTap: () => onSelect(_GameMode.customQuestions),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Progress bar
+              if (session.asked > 0) ...[
+                _ProgressSection(
+                  correct: session.correct,
+                  asked: session.asked,
+                ),
+                const SizedBox(height: 14),
+                // Finish + claim points
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: onFinish,
+                    icon: const Icon(Icons.emoji_events_rounded, size: 20),
+                    label: Text(
+                      'أنهِ التحدي واحصل على ${session.correct * xpPerQuizCorrect} نقطة ⭐',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4A44A),
+                      foregroundColor: const Color(0xFF095752),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // Bottom hint
+              const Center(
+                child: Text(
+                  'اضغط على أي تحدٍّ لتبدأ! 🎉',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-
-          // Game grid — fixed tile size so columns grow on tablet / web
-          // instead of the two cards stretching huge.
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 240,
-              mainAxisExtent: 196,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-            ),
-            itemCount: _kidsModes.length,
-            itemBuilder: (_, i) => _KidsGameCard(
-              data: _kidsModes[i],
-              onTap: () => onSelect(_kidsModes[i].mode),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Custom challenges card
-          if (customCount > 0) ...[
-            _CustomChallengesCard(
-              count: customCount,
-              onTap: () => onSelect(_GameMode.customQuestions),
-            ),
-            const SizedBox(height: 20),
-          ],
-
-          // Progress bar
-          if (session.asked > 0) ...[
-            _ProgressSection(
-              correct: session.correct,
-              asked: session.asked,
-            ),
-            const SizedBox(height: 14),
-            // Finish + claim points
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: onFinish,
-                icon: const Icon(Icons.emoji_events_rounded, size: 20),
-                label: Text(
-                  'أنهِ التحدي واحصل على ${session.correct * xpPerQuizCorrect} نقطة ⭐',
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w800),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4A44A),
-                  foregroundColor: const Color(0xFF095752),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Bottom hint
-          const Center(
-            child: Text(
-              'اضغط على أي تحدٍّ لتبدأ! 🎉',
-              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-            ),
-          ),
-        ],
           ),
         ),
       ),
@@ -731,7 +782,8 @@ class _KidsGameCardState extends State<_KidsGameCard> {
                         clipBehavior: Clip.none,
                         children: [
                           Container(
-                            width: 58, height: 58,
+                            width: 58,
+                            height: 58,
                             decoration: BoxDecoration(
                               color: d.iconBg,
                               borderRadius: BorderRadius.circular(18),
@@ -745,14 +797,16 @@ class _KidsGameCardState extends State<_KidsGameCard> {
                           ),
                           if (d.stars == 3)
                             Positioned(
-                              top: -4, right: -4,
+                              top: -4,
+                              right: -4,
                               child: Container(
-                                width: 18, height: 18,
+                                width: 18,
+                                height: 18,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF59E0B),
                                   shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white, width: 2),
+                                  border:
+                                      Border.all(color: Colors.white, width: 2),
                                 ),
                                 child: const Center(
                                   child: Text(
@@ -858,7 +912,8 @@ class _CustomChallengesCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 56, height: 56,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(16),

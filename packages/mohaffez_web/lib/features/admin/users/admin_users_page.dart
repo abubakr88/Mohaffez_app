@@ -8,7 +8,14 @@ import '../../auth/auth_provider.dart' as web_auth;
 import 'admin_users_csv.dart';
 
 class AdminUsersPage extends ConsumerStatefulWidget {
-  const AdminUsersPage({super.key});
+  const AdminUsersPage({
+    super.key,
+    this.initialRoleFilter,
+    this.initialStatusFilter,
+  });
+
+  final String? initialRoleFilter;
+  final String? initialStatusFilter;
 
   @override
   ConsumerState<AdminUsersPage> createState() => _AdminUsersPageState();
@@ -16,6 +23,33 @@ class AdminUsersPage extends ConsumerStatefulWidget {
 
 class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
   final Map<String, Map<String, dynamic>> _selectedUsers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_applyInitialFilters);
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminUsersPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialRoleFilter != widget.initialRoleFilter ||
+        oldWidget.initialStatusFilter != widget.initialStatusFilter) {
+      Future<void>.microtask(_applyInitialFilters);
+    }
+  }
+
+  void _applyInitialFilters() {
+    if (!mounted) return;
+    final notifier = ref.read(userFilterProvider.notifier);
+    notifier.reset();
+    if (widget.initialRoleFilter != null) {
+      notifier.setRole(widget.initialRoleFilter);
+    }
+    if (widget.initialStatusFilter != null) {
+      notifier.setStatus(widget.initialStatusFilter);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

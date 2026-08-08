@@ -24,6 +24,39 @@ function safeNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function safeBooleanFacet(
+  value: unknown,
+  allowedKeys: readonly string[],
+): Record<string, boolean> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  return Object.fromEntries(
+    allowedKeys
+      .filter((key) => source[key] === true)
+      .map((key) => [key, true]),
+  );
+}
+
+const TEACHING_SERVICE_KEYS = [
+  "memorization", "review", "foundation", "tajweed",
+  "recitation_correction", "ijazah", "qiraat",
+] as const;
+const LEARNER_AGE_KEYS = ["children", "teens", "adults"] as const;
+const LEARNER_GENDER_KEYS = ["male", "female"] as const;
+const LEARNER_LEVEL_KEYS = ["beginner", "intermediate", "advanced"] as const;
+const TEACHING_LANGUAGE_KEYS = ["ar", "en", "id", "fr", "tr", "ur"] as const;
+
+function safeLearnerAudiences(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  return Object.fromEntries(
+    LEARNER_AGE_KEYS.map((ageGroup) => [
+      ageGroup,
+      safeBooleanFacet(source[ageGroup], LEARNER_GENDER_KEYS),
+    ]).filter(([, genders]) => Object.keys(genders as object).length > 0),
+  );
+}
+
 function publicUserProfile(
   id: string,
   data: FirebaseFirestore.DocumentData,
@@ -35,6 +68,37 @@ function publicUserProfile(
     role: "mohaffez",
     status: data.status,
     specialization: safeString(data.specialization),
+    teachingServices: safeBooleanFacet(
+      data.teachingServices,
+      TEACHING_SERVICE_KEYS,
+    ),
+    learnerAudiences: safeLearnerAudiences(data.learnerAudiences),
+    learnerAgeGroups: safeBooleanFacet(
+      data.learnerAgeGroups,
+      LEARNER_AGE_KEYS,
+    ),
+    learnerGenders: safeBooleanFacet(
+      data.learnerGenders,
+      LEARNER_GENDER_KEYS,
+    ),
+    learnerLevels: safeBooleanFacet(
+      data.learnerLevels,
+      LEARNER_LEVEL_KEYS,
+    ),
+    teachingLanguages: safeBooleanFacet(
+      data.teachingLanguages,
+      TEACHING_LANGUAGE_KEYS,
+    ),
+    primaryTeachingLanguage:
+      TEACHING_LANGUAGE_KEYS.includes(data.primaryTeachingLanguage)
+        ? data.primaryTeachingLanguage
+        : null,
+    discoveryProfileVersion:
+      data.discoveryProfileVersion === 2
+        ? 2
+        : data.discoveryProfileVersion === 1
+          ? 1
+          : 0,
     bio: safeString(data.bio),
     photoUrl: safeString(data.photoUrl),
     youtubeVideoUrl: safeString(data.youtubeVideoUrl),

@@ -87,7 +87,7 @@ final acceptedSessionsCountProvider = FutureProvider.family<int, String>(
 );
 
 final acceptedStudentSessionsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, studentId) {
     return FirebaseFirestore.instance
         .collection('hafizSessions')
@@ -247,13 +247,20 @@ final studentUpcomingSessionsProvider =
             }).map((doc) {
               final data = doc.data();
               return <String, dynamic>{
+                ...data,
                 'id': doc.id,
                 'sessionDate': _parseSessionDateTime(
                   (data['sessionDate'] as Timestamp?)?.toDate(),
                   data['preferredTimeSlot'] as String? ??
                       data['timeSlot'] as String?,
                 ),
+                'slotStart': (data['slotStart'] as Timestamp?)?.toDate(),
+                'slotEnd': (data['slotEnd'] as Timestamp?)?.toDate(),
+                'mohaffezId': data['mohaffezId'] as String? ?? '',
                 'mohaffezName': data['mohaffezName'] as String? ?? '',
+                'studentId': data['studentId'] as String? ?? studentId,
+                'studentProfileId': data['studentProfileId'] as String?,
+                'studentProfileName': data['studentProfileName'] as String?,
                 'isPaid': data['isPaid'] as bool? ?? false,
                 'isTrial': data['isTrial'] as bool? ?? false,
                 'bookingKind': data['bookingKind'] as String?,
@@ -304,7 +311,7 @@ final filteredUpcomingSessionsProvider =
 // COMPLETED SESSIONS - Stream (Real-time)
 // ============================================================================
 final completedSessionsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('hafizSessions')
@@ -1161,6 +1168,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'sessionRating': sessionRating,
         'isLateCompletion': isLateCompletion,
         'quizUnlocked': false,
+        'challengeAccess.status': 'closed',
       };
 
       if (previousHifzCompleted != null) {

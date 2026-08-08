@@ -13,6 +13,10 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
 import { isAcceptingNewBookings } from "../teacherBookingPolicy";
+import {
+  audienceAgeGroup,
+  teacherAcceptsAudience,
+} from "../teacherAudiencePolicy";
 
 const STATUS = {
   PENDING: "pending",
@@ -399,13 +403,15 @@ export const createSessionRequest = functions.https.onCall(
       const configSnap = await transaction.get(
         db.collection("systemConfig").doc("global"),
       );
+      const systemConfig = configSnap.data() ?? {};
       const variablePlanDurationEnabled =
-        configSnap.data()?.variablePlanSessionDurationEnabled === true;
+        systemConfig.variablePlanSessionDurationEnabled === true;
 
       const teacherSnap = await transaction.get(
         db.collection("users").doc(mohaffezId),
       );
-      if (!isAcceptingNewBookings(teacherSnap.data())) {
+      const teacherData = teacherSnap.data() ?? {};
+      if (!isAcceptingNewBookings(teacherData)) {
         throw new functions.https.HttpsError(
           "failed-precondition",
           "المحفظ لا يستقبل طلبات حجز جديدة حاليًا",
@@ -571,22 +577,6 @@ export const createSessionRequest = functions.https.onCall(
             "الباقة المختارة غير نشطة أو انتهت صلاحيتها",
           );
         }
-        const studentAccountSnap = await transaction.get(
-          db.collection("users").doc(studentId),
-        );
-        const studentAccountRole = optionalString(
-          studentAccountSnap.data()?.role,
-        )?.toLowerCase();
-        if (
-          studentAccountRole === "parent" &&
-          (!optionalString(subscription.studentProfileId) ||
-            !optionalString(subscription.studentProfileName))
-        ) {
-          throw new functions.https.HttpsError(
-            "failed-precondition",
-            "لا تحتوي الباقة على بيانات الابن المرتبط بها",
-          );
-        }
         resolvedGuardianId =
           optionalString(subscription.guardianId) ?? subscription.studentId;
         resolvedGuardianName = optionalString(subscription.guardianName);
@@ -668,6 +658,77 @@ export const createSessionRequest = functions.https.onCall(
             plan.sessionDurationMinutes,
           );
         }
+      }
+
+      if (systemConfig.discoveryAudienceMatchingEnabled !== false) {
+        const studentAccountSnap = await transaction.get(
+          db.collection("users").doc(studentId),
+        );
+        const studentAccount = studentAccountSnap.data() ?? {};
+        const studentAccountRole = optionalString(studentAccount.role)
+          ?.toLowerCase();
+        let canonicalLearner = studentAccount;
+
+        if (studentAccountRole === "parent") {
+          if (!resolvedStudentProfileId ||
+              resolvedStudentProfileId === "self") {
+            throw new functions.https.HttpsError(
+              "failed-precondition",
+              "اختر ملف الطالب وأكمل بياناته قبل الحجز",
+            );
+          }
+          const learnerProfileSnap = await transaction.get(
+            db.collection("users")
+              .doc(studentId)
+              .collection("studentProfiles")
+              .doc(resolvedStudentProfileId),
+          );
+          if (!learnerProfileSnap.exists ||
+              learnerProfileSnap.data()?.isActive === false) {
+            throw new functions.https.HttpsError(
+              "failed-precondition",
+              "ملف الطالب المختار غير متاح",
+            );
+          }
+          canonicalLearner = learnerProfileSnap.data() ?? {};
+        }
+
+        const canonicalGender = optionalString(canonicalLearner.gender)
+          ?.toLowerCase();
+        const canonicalBirthDate = optionalTimestamp(
+          canonicalLearner.dateOfBirth,
+        );
+        const canonicalAge = calculateAgeFromTimestamp(canonicalBirthDate);
+        if ((canonicalGender !== "male" && canonicalGender !== "female") ||
+            canonicalAge === null || canonicalBirthDate === null) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "أكمل نوع الطالب وتاريخ ميلاده قبل الحجز",
+          );
+        }
+        const ageGroup = audienceAgeGroup(canonicalAge, systemConfig);
+        const allowIncomplete =
+          systemConfig.allowIncompleteTeacherAudience !== false;
+        if (!teacherAcceptsAudience(
+          teacherData,
+          ageGroup,
+          canonicalGender,
+          allowIncomplete,
+        )) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "هذا المحفّظ لا يدرّس الفئة العمرية والنوع المحددين",
+          );
+        }
+
+        resolvedStudentProfileGender = canonicalGender;
+        resolvedStudentProfileBirthDate = canonicalBirthDate;
+        resolvedStudentAge = canonicalAge;
+        resolvedStudentProfileName = optionalString(canonicalLearner.name) ??
+          resolvedStudentProfileName;
+        resolvedStudentName = resolvedStudentProfileName ??
+          optionalString(canonicalLearner.name) ??
+          resolvedStudentName;
       }
 
       sessionDurationMinutes = variablePlanDurationEnabled

@@ -51,6 +51,7 @@ class RoleGuard implements RouteGuard {
     '/credentials',
     '/availability',
     '/wallet-settings',
+    '/student-challenges',
   ];
 
   // Student-only routes.
@@ -59,6 +60,8 @@ class RoleGuard implements RouteGuard {
     '/nearby',
     '/assignments',
     '/requests',
+    '/student-challenge',
+    '/live-recitation',
     '/mohaffez', // profiles
   ];
 

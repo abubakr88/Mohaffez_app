@@ -82,6 +82,126 @@ service cloud.firestore {
                 minimumRate * plan.sessionsCount * plan.sessionDurationMinutes);
     }
 
+    function validTeachingServices(data) {
+      let value = data.get('teachingServices', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly([
+               'memorization', 'review', 'foundation', 'tajweed',
+               'recitation_correction', 'ijazah', 'qiraat'
+             ]) &&
+             value.get('memorization', false) is bool &&
+             value.get('review', false) is bool &&
+             value.get('foundation', false) is bool &&
+             value.get('tajweed', false) is bool &&
+             value.get('recitation_correction', false) is bool &&
+             value.get('ijazah', false) is bool &&
+             value.get('qiraat', false) is bool &&
+             (
+               value.get('memorization', false) == true ||
+               value.get('review', false) == true ||
+               value.get('foundation', false) == true ||
+               value.get('tajweed', false) == true ||
+               value.get('recitation_correction', false) == true ||
+               value.get('ijazah', false) == true ||
+               value.get('qiraat', false) == true
+             );
+    }
+
+    function validLearnerAgeGroups(data) {
+      let value = data.get('learnerAgeGroups', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['children', 'teens', 'adults']) &&
+             value.get('children', false) is bool &&
+             value.get('teens', false) is bool &&
+             value.get('adults', false) is bool &&
+             (
+               value.get('children', false) == true ||
+               value.get('teens', false) == true ||
+               value.get('adults', false) == true
+             );
+    }
+
+    function validLearnerGenders(data) {
+      let value = data.get('learnerGenders', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['male', 'female']) &&
+             value.get('male', false) is bool &&
+             value.get('female', false) is bool &&
+             (
+               value.get('male', false) == true ||
+               value.get('female', false) == true
+             );
+    }
+
+    function validAudienceGenderMap(value) {
+      return value is map &&
+             value.keys().hasOnly(['male', 'female']) &&
+             value.get('male', false) is bool &&
+             value.get('female', false) is bool;
+    }
+
+    function validLearnerAudiences(data) {
+      let value = data.get('learnerAudiences', {});
+      let children = value.get('children', {});
+      let teens = value.get('teens', {});
+      let adults = value.get('adults', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['children', 'teens', 'adults']) &&
+             validAudienceGenderMap(children) &&
+             validAudienceGenderMap(teens) &&
+             validAudienceGenderMap(adults) &&
+             (
+               children.get('male', false) == true ||
+               children.get('female', false) == true ||
+               teens.get('male', false) == true ||
+               teens.get('female', false) == true ||
+               adults.get('male', false) == true ||
+               adults.get('female', false) == true
+             );
+    }
+
+    function validLearnerLevels(data) {
+      let value = data.get('learnerLevels', {});
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['beginner', 'intermediate', 'advanced']) &&
+             value.get('beginner', false) is bool &&
+             value.get('intermediate', false) is bool &&
+             value.get('advanced', false) is bool &&
+             (
+               value.get('beginner', false) == true ||
+               value.get('intermediate', false) == true ||
+               value.get('advanced', false) == true
+             );
+    }
+
+    function validTeachingLanguages(data) {
+      let value = data.get('teachingLanguages', {});
+      let primary = data.get('primaryTeachingLanguage', '');
+      return value is map && value.size() > 0 &&
+             value.keys().hasOnly(['ar', 'en', 'id', 'fr', 'tr', 'ur']) &&
+             value.get('ar', false) is bool &&
+             value.get('en', false) is bool &&
+             value.get('id', false) is bool &&
+             value.get('fr', false) is bool &&
+             value.get('tr', false) is bool &&
+             value.get('ur', false) is bool &&
+             primary in ['ar', 'en', 'id', 'fr', 'tr', 'ur'] &&
+             value.get(primary, false) == true;
+    }
+
+    function validTeacherDiscoveryProfile(data) {
+      return validTeachingServices(data) &&
+             validLearnerLevels(data) &&
+             validTeachingLanguages(data) &&
+             (
+               (data.get('discoveryProfileVersion', 0) == 2 &&
+                validLearnerAudiences(data)) ||
+               (data.get('discoveryProfileVersion', 0) == 1 &&
+                validLearnerAgeGroups(data) &&
+                validLearnerGenders(data))
+             );
+    }
+
     // Admin authority is granted exclusively via custom claims minted server-side
     // (Cloud Functions / Admin SDK). The previous Firestore-doc fallback is removed
     // so a self-set `role: 'admin'` field on /users/{uid} cannot grant admin powers.
@@ -209,13 +329,17 @@ service cloud.firestore {
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
             'addressLng', 'specialization', 'name', 'honorific',
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
             'acceptingNewBookings',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
-            'setupCompleted', 'dateOfBirth', 'city',
+            'setupCompleted', 'dateOfBirth', 'gender', 'city',
             'country', 'countryCode',
             'accountType', 'activeStudentProfileId',
             'examScore', 'examTakenAt',
@@ -269,6 +393,16 @@ service cloud.firestore {
               ]
             )
           )
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion'
+          ]) ||
+          (resource.data.role == 'mohaffez' &&
+           validTeacherDiscoveryProfile(request.resource.data))
         );
 
       // Mohaffez submitting for admin approval (registration step 3)
@@ -280,9 +414,14 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly([
             'bio', 'specialization', 'youtubeVideoUrl',
+            'teachingServices', 'learnerAudiences',
+            'learnerAgeGroups', 'learnerGenders',
+            'learnerLevels', 'teachingLanguages',
+            'primaryTeachingLanguage', 'discoveryProfileVersion',
             'status', 'setupCompleted',
             'approvalSubmittedAt', 'updatedAt'
-          ]);
+          ]) &&
+        validTeacherDiscoveryProfile(request.resource.data);
 
       // Admin user-management writes are permission-scoped. Cloud Functions
       // still bypass rules via Admin SDK for privileged workflows.
@@ -429,9 +568,23 @@ service cloud.firestore {
       // Teacher (userId == mohaffezId) has full write access.
       // Student can read their own questions when a session is active.
       match /studentChallenges/{studentId}/questions/{questionId} {
-        allow read: if isOwner(userId) || request.auth.uid == studentId;
+        allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // V2 consolidated challenge bank: one read/save per learner.
+      // Answers remain private to the owning teacher.
+      match /studentChallengeBanks/{learnerKey} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+          request.resource.data.learnerKey == learnerKey &&
+          request.resource.data.studentId is string &&
+          request.resource.data.studentProfileId is string &&
+          request.resource.data.schemaVersion == 2 &&
+          request.resource.data.questions is list &&
+          request.resource.data.questions.size() <= 30;
         allow delete: if isOwner(userId);
       }
 
@@ -628,6 +781,75 @@ service cloud.firestore {
       allow delete: if isAuthenticated() &&
         request.auth.uid == resource.data.mohaffezId &&
         resource.data.status == 'cancelled';
+
+      // Student-visible prompts are embedded on the parent session document.
+      // Only the teacher may inspect the separately stored answer key.
+      match /challengePrivate/{setVersion} {
+        allow read: if isAuthenticated() &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId ==
+            request.auth.uid;
+        allow create, update, delete: if false;
+      }
+
+      // A single compact document synchronizes the live recitation-card game.
+      // Quran text and card payloads stay in local app assets; only round state
+      // is stored here to keep reads, writes, and bandwidth small.
+      match /liveGames/{gameId} {
+        allow get: if gameId == 'recitationCards' && isAuthenticated() && (
+          (resource != null && (
+            request.auth.uid == resource.data.studentId ||
+            request.auth.uid == resource.data.mohaffezId
+          )) ||
+          (resource == null && (
+            request.auth.uid ==
+              get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.studentId ||
+            request.auth.uid ==
+              get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId
+          ))
+        );
+        allow list: if false;
+
+        allow create: if gameId == 'recitationCards' &&
+          isAuthenticated() &&
+          request.auth.uid == request.resource.data.mohaffezId &&
+          request.resource.data.schemaVersion == 1 &&
+          request.resource.data.status == 'playing' &&
+          request.resource.data.cardCount in [4, 6, 8] &&
+          request.resource.data.scopes is list &&
+          request.resource.data.results is map &&
+          request.resource.data.selectedIndex == null &&
+          request.resource.data.expiresAt is timestamp &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.status ==
+            'accepted' &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.mohaffezId ==
+            request.resource.data.mohaffezId &&
+          get(/databases/$(database)/documents/hafizSessions/$(sessionId)).data.studentId ==
+            request.resource.data.studentId;
+
+        allow update: if gameId == 'recitationCards' &&
+          isAuthenticated() &&
+          request.resource.data.mohaffezId == resource.data.mohaffezId &&
+          request.resource.data.studentId == resource.data.studentId &&
+          request.resource.data.studentProfileId == resource.data.studentProfileId &&
+          request.resource.data.schemaVersion == resource.data.schemaVersion &&
+          (
+            request.auth.uid == resource.data.mohaffezId ||
+            (
+              request.auth.uid == resource.data.studentId &&
+              resource.data.status == 'playing' &&
+              resource.data.selectedIndex == null &&
+              request.time < resource.data.expiresAt &&
+              onlyUpdating(['selectedIndex', 'selectedBy', 'updatedAt']) &&
+              request.resource.data.selectedIndex is int &&
+              request.resource.data.selectedIndex >= 0 &&
+              request.resource.data.selectedIndex < resource.data.cardCount &&
+              request.resource.data.selectedBy == request.auth.uid &&
+              request.resource.data.updatedAt == request.time
+            )
+          );
+
+        allow delete: if false;
+      }
     }
 
     // ============================================

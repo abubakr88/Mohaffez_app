@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../providers/mohaffez_profile_providers.dart';
-import '../providers/quiz_access_provider.dart';
 import '../providers/student_count_provider.dart';
 import '../providers/trial_session_provider.dart';
 import '../screens/teacher/mohaffez_student_detail_screen.dart';
@@ -136,7 +135,6 @@ List<Override> _studentOverrides(DemoStudentFixture fixture) {
     activeBundleForTeacherProvider.overrideWith((ref, _) async => null),
     studentCompletedSessionsProvider
         .overrideWith((ref, _) async => fixture.completedSessionsCount),
-    quizUnlockedSessionProvider.overrideWith((ref, _) => Stream.value(null)),
     nearbyMohaffezProvider.overrideWith((ref, _) async => _demoMohaffezList),
     mohaffezProfileProvider.overrideWith((ref, mohaffezId) {
       final demo = _demoMohaffezList.firstWhere(

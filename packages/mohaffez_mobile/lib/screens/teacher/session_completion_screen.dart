@@ -1,17 +1,21 @@
 // screens/session_completion_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../providers/quiz_access_provider.dart';
 import '../../services/meeting_launcher_service.dart';
+import '../../providers/live_recitation_provider.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final String studentName;
+  final String? mohaffezId;
+  final String? studentId;
+  final String? studentProfileId;
   final String? previousHifz;
   final String? previousMuraja;
   final String? previousHifzFromAyah;
@@ -25,6 +29,9 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     super.key,
     required this.sessionId,
     required this.studentName,
+    this.mohaffezId,
+    this.studentId,
+    this.studentProfileId,
     this.previousHifz,
     this.previousMuraja,
     this.previousHifzFromAyah,
@@ -268,6 +275,8 @@ class _SessionCompletionScreenState
                 sessionMistakes.map((m) => m.pageNumber).toSet().toList(),
             currentPage: currentQuranPage,
           );
+
+      await closeLiveRecitationGame(widget.sessionId).catchError((_) {});
 
       if (!mounted) return;
 
@@ -1094,7 +1103,47 @@ class _SessionCompletionScreenState
                 color: AppThemeConstants.primary,
               ),
               const SizedBox(height: 12),
-              _QuizToggleCard(sessionId: widget.sessionId),
+              Card(
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.style_rounded),
+                  ),
+                  title: const Text(
+                    'ألعاب الجلسة المباشرة',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: const Text(
+                    'شغّل كروت التسميع وبقية الألعاب مع الطالب الآن',
+                  ),
+                  trailing: const Icon(Icons.arrow_back_rounded),
+                  onTap: () => context.push(
+                    '/session-quiz',
+                    extra: {
+                      'sessionId': widget.sessionId,
+                      'studentName': widget.studentName,
+                      'mohaffezId': widget.mohaffezId,
+                      'studentId': widget.studentId,
+                      'studentProfileId': widget.studentProfileId,
+                      'previousHifz': widget.previousHifz,
+                      'previousMuraja': widget.previousMuraja,
+                      'previousHifzFromAyah': widget.previousHifzFromAyah,
+                      'previousHifzToAyah': widget.previousHifzToAyah,
+                      'previousMurajaFromAyah': widget.previousMurajaFromAyah,
+                      'previousMurajaToAyah': widget.previousMurajaToAyah,
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _QuizToggleCard(
+                sessionId: widget.sessionId,
+                studentName: widget.studentName,
+              ),
 
               const SizedBox(height: 24),
 
@@ -1425,87 +1474,132 @@ class _SessionCompletionScreenState
   }
 }
 
-class _QuizToggleCard extends ConsumerWidget {
+class _QuizToggleCard extends ConsumerStatefulWidget {
   final String sessionId;
-  const _QuizToggleCard({required this.sessionId});
+  final String studentName;
+
+  const _QuizToggleCard({
+    required this.sessionId,
+    required this.studentName,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final quizAsync = ref.watch(sessionQuizStateProvider(sessionId));
-    final isUnlocked = quizAsync.valueOrNull ?? false;
+  ConsumerState<_QuizToggleCard> createState() => _QuizToggleCardState();
+}
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isUnlocked
-                    ? AppThemeConstants.secondary.withValues(alpha: 0.12)
-                    : AppThemeConstants.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isUnlocked ? Icons.extension_rounded : Icons.lock_rounded,
-                color: isUnlocked
-                    ? AppThemeConstants.secondary
-                    : AppThemeConstants.primary,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isUnlocked ? 'التحديات مفعّلة للطالب' : 'التحديات مغلقة',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isUnlocked
-                          ? AppThemeConstants.secondary
-                          : AppThemeConstants.textPrimary,
-                    ),
+class _QuizToggleCardState extends ConsumerState<_QuizToggleCard> {
+  late final Future<DocumentSnapshot<Map<String, dynamic>>> _sessionFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionFuture = FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .doc(widget.sessionId)
+        .get();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: _sessionFuture,
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final access = data?['challengeAccess'] as Map?;
+        final isOpen = access?['status'] == 'open';
+        final count = (access?['questionCount'] as num?)?.toInt() ?? 0;
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isOpen
+                        ? AppThemeConstants.secondary.withValues(alpha: 0.12)
+                        : AppThemeConstants.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isUnlocked
-                        ? 'يمكن للطالب الآن فتح تحديات الجلسة'
-                        : 'فعّل الزر ليتمكن الطالب من دخول التحديات',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppThemeConstants.textSecondary,
-                    ),
+                  child: Icon(
+                    isOpen ? Icons.extension_rounded : Icons.add_task_rounded,
+                    color: isOpen
+                        ? AppThemeConstants.secondary
+                        : AppThemeConstants.primary,
+                    size: 22,
                   ),
-                ],
-              ),
-            ),
-            Switch.adaptive(
-              value: isUnlocked,
-              activeThumbColor: AppThemeConstants.secondary,
-              activeTrackColor:
-                  AppThemeConstants.secondary.withValues(alpha: 0.4),
-              onChanged: (val) async {
-                try {
-                  await setQuizUnlocked(sessionId: sessionId, unlocked: val);
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('تعذّر تغيير حالة التحديات'),
-                        backgroundColor: AppThemeConstants.error,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isOpen
+                            ? 'تحدي الجلسة منشور ($count أسئلة)'
+                            : 'جهّز تحدي الجلسة',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: isOpen
+                              ? AppThemeConstants.secondary
+                              : AppThemeConstants.textPrimary,
+                        ),
                       ),
-                    );
-                  }
-                }
-              },
+                      const SizedBox(height: 2),
+                      const Text(
+                        'اختر الأسئلة وانشرها دفعة واحدة للطالب',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton.filledTonal(
+                    tooltip: 'إدارة التحدي',
+                    onPressed: data == null
+                        ? null
+                        : () => context.push(
+                              '/student-challenges',
+                              extra: {
+                                'mohaffezId': data['mohaffezId'] as String? ??
+                                    ref.read(currentUserIdProvider) ??
+                                    '',
+                                'studentId': data['studentId'] as String? ?? '',
+                                'studentProfileId':
+                                    data['studentProfileId'] as String?,
+                                'studentName':
+                                    data['studentProfileName'] as String? ??
+                                        widget.studentName,
+                                'sessions': [
+                                  {
+                                    ...data,
+                                    'id': widget.sessionId,
+                                    'sessionDate':
+                                        data['sessionDate'] is Timestamp
+                                            ? (data['sessionDate'] as Timestamp)
+                                                .toDate()
+                                            : data['sessionDate'],
+                                  },
+                                ],
+                              },
+                            ),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

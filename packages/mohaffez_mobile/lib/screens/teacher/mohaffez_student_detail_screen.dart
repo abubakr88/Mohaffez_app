@@ -1,5 +1,7 @@
 // lib/screens/mohaffez_student_detail_screen.dart
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +14,10 @@ import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'teacher_active_bundle_card.dart';
 
-// Provider: all sessions between this teacher and this specific student
+const _studentDetailSessionLimit = 5;
+const _studentDetailSessionCacheDuration = Duration(minutes: 5);
+
+// Provider: latest sessions between this teacher and this specific student.
 final studentDetailSessionsProvider = FutureProvider.autoDispose.family<
     List<Map<String, dynamic>>,
     ({
@@ -30,19 +35,22 @@ final studentDetailSessionsProvider = FutureProvider.autoDispose.family<
     query = query.where('studentProfileId', isEqualTo: profileId);
   }
 
-  final snapshot =
-      await query.limit(50).get().timeout(const Duration(seconds: 15));
+  final snapshot = await query
+      .orderBy('sessionDate', descending: true)
+      .limit(_studentDetailSessionLimit)
+      .get()
+      .timeout(const Duration(seconds: 15));
 
-  final docs = snapshot.docs
-    ..sort((a, b) {
-      final aDate =
-          (a.data()['sessionDate'] as Timestamp?)?.toDate() ?? DateTime(0);
-      final bDate =
-          (b.data()['sessionDate'] as Timestamp?)?.toDate() ?? DateTime(0);
-      return bDate.compareTo(aDate);
-    });
+  // Cache successful results briefly so reopening the same student does not
+  // immediately repeat the read. Pull-to-refresh still fetches fresh data.
+  final cacheLink = ref.keepAlive();
+  final cacheTimer = Timer(
+    _studentDetailSessionCacheDuration,
+    cacheLink.close,
+  );
+  ref.onDispose(cacheTimer.cancel);
 
-  return docs.map((doc) {
+  return snapshot.docs.map((doc) {
     final data = doc.data();
     return <String, dynamic>{
       ...data,
@@ -75,6 +83,8 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
       studentProfileId: student.studentProfileId,
     );
     final sessionsAsync = ref.watch(studentDetailSessionsProvider(params));
+    final challengeV2Enabled =
+        ref.watch(systemConfigProvider).valueOrNull?.challengeV2Enabled ?? true;
     final bundlesAsync = effectiveMohaffezId.isEmpty
         ? const AsyncValue<List<TeacherActiveBundleInfo>>.data([])
         : ref.watch(teacherActiveBundlesProvider(effectiveMohaffezId));
@@ -132,14 +142,20 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => context.push(
-                            '/student-challenges',
-                            extra: {
-                              'mohaffezId': mohaffezId,
-                              'studentId': student.studentId,
-                              'studentName': student.studentName,
-                            },
-                          ),
+                          onPressed: challengeV2Enabled
+                              ? () => context.push(
+                                    '/student-challenges',
+                                    extra: {
+                                      'mohaffezId': effectiveMohaffezId,
+                                      'studentId': student.studentId,
+                                      'studentProfileId':
+                                          student.studentProfileId,
+                                      'studentName': student.studentName,
+                                      'sessions':
+                                          sessionsAsync.valueOrNull ?? const [],
+                                    },
+                                  )
+                              : null,
                           icon: const Icon(Icons.extension_rounded, size: 18),
                           label: const Text('التحديات'),
                           style: OutlinedButton.styleFrom(
@@ -210,7 +226,8 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold),
                                     ),
-                                    if (student.sessionCount > 50) ...[
+                                    if (student.sessionCount >
+                                        _studentDetailSessionLimit) ...[
                                       const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -222,7 +239,7 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                                               BorderRadius.circular(8),
                                         ),
                                         child: const Text(
-                                          'آخر 50',
+                                          'آخر 5',
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: AppThemeConstants.warning,

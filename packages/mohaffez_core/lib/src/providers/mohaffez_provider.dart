@@ -1,29 +1,87 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/mohaffez_model.dart';
 import 'server_clock_provider.dart';
 
+const _teacherDirectoryCacheDuration = Duration(minutes: 5);
+
+/// Shared directory read. Changing local search filters reuses this result
+/// instead of downloading every active teacher again.
+final activeMohaffezDirectoryProvider =
+    FutureProvider.autoDispose<List<MohaffezModel>>((ref) async {
+  final keepAlive = ref.keepAlive();
+  final timer = Timer(_teacherDirectoryCacheDuration, keepAlive.close);
+  ref.onDispose(timer.cancel);
+
+  final snapshot = await FirebaseFirestore.instance
+      .collection('users')
+      .where('role', isEqualTo: 'mohaffez')
+      .where('status', isEqualTo: 'active')
+      .where('addressLat', isNotEqualTo: null)
+      .get()
+      .timeout(const Duration(seconds: 15));
+
+  return snapshot.docs
+      .map((doc) => MohaffezModel.fromFirestore(doc))
+      .where(
+        (mohaffez) =>
+            mohaffez.addressLat != null && mohaffez.addressLng != null,
+      )
+      .toList(growable: false);
+});
+
+class _TeacherBookability {
+  final bool hasAvailableSlot;
+  final bool hasMatchingPlan;
+
+  const _TeacherBookability({
+    required this.hasAvailableSlot,
+    required this.hasMatchingPlan,
+  });
+}
+
+final _teacherBookabilityProvider = FutureProvider.autoDispose.family<
+    _TeacherBookability,
+    ({
+      String teacherId,
+      TeacherSessionTypeFilter sessionType
+    })>((ref, args) async {
+  final keepAlive = ref.keepAlive();
+  final timer = Timer(_teacherDirectoryCacheDuration, keepAlive.close);
+  ref.onDispose(timer.cancel);
+
+  final firestore = FirebaseFirestore.instance;
+  final now = serverNowFromRef(ref);
+  final results = await Future.wait<bool>([
+    _hasUpcomingAvailableSlot(
+      firestore,
+      args.teacherId,
+      now,
+      sessionTypeFilter: args.sessionType,
+    ),
+    _hasActivePricingPlan(
+      firestore,
+      args.teacherId,
+      sessionTypeFilter: args.sessionType,
+    ),
+  ]);
+  return _TeacherBookability(
+    hasAvailableSlot: results[0],
+    hasMatchingPlan: results[1],
+  );
+});
+
 // Provider للحصول على قائمة المحفظين
 final nearbyMohaffezProvider = FutureProvider.autoDispose
     .family<List<MohaffezModel>, NearbyParams>((ref, params) async {
   try {
-    final firestore = FirebaseFirestore.instance;
-
-    // استعلام للحصول على المحفظين فقط
-    final snapshot = await firestore
-        .collection('users')
-        .where('role', isEqualTo: 'mohaffez')
-        .where('status', isEqualTo: 'active')
-        .where('addressLat', isNotEqualTo: null)
-        .get()
-        .timeout(const Duration(seconds: 15));
-
-    List<MohaffezModel> mohaffezList = snapshot.docs
-        .map((doc) => MohaffezModel.fromFirestore(doc))
-        .where((mohaffez) {
-      // تصفية المحفظين الذين لديهم إحداثيات صحيحة
-      return mohaffez.addressLat != null && mohaffez.addressLng != null;
-    }).toList();
+    // Keep local filter changes on the cached directory rather than repeating
+    // the same Firestore query for every NearbyParams combination.
+    List<MohaffezModel> mohaffezList = [
+      ...await ref.watch(activeMohaffezDirectoryProvider.future),
+    ];
 
     // تصفية حسب نطاق المسافة إذا كان موقع المستخدم متاحاً
     if (params.distanceFilterEnabled &&
@@ -52,6 +110,13 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
+    // Structured discovery filters are explicit choices made by the learner.
+    // They are therefore strict, unlike the suggested profile values which
+    // only influence ranking below.
+    mohaffezList = mohaffezList.where((mohaffez) {
+      return _matchesExplicitDiscoveryFilters(mohaffez, params);
+    }).toList();
+
     if (params.genderFilter != TeacherGenderFilter.all) {
       mohaffezList = mohaffezList.where((mohaffez) {
         final gender = mohaffez.gender?.toLowerCase().trim();
@@ -70,35 +135,26 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     // تصفية حسب قابلية الحجز: وقت قادم مفعّل + خطة سعر نشطة
     if (params.availabilityFilter != TeacherAvailabilityFilter.all ||
         params.sessionTypeFilter != TeacherSessionTypeFilter.all) {
-      final now = serverNowFromRef(ref);
-      final slotEntries = await Future.wait(
-        mohaffezList.map((mohaffez) async {
-          final hasAvailableSlot = await _hasUpcomingAvailableSlot(
-            firestore,
-            mohaffez.id,
-            now,
-            sessionTypeFilter: params.sessionTypeFilter,
-          );
-          return MapEntry(mohaffez.id, hasAvailableSlot);
-        }),
-      );
-      final slotById = Map.fromEntries(slotEntries);
-
-      final planEntries = await Future.wait(
-        mohaffezList.map((mohaffez) async {
-          final hasActivePlan = await _hasActivePricingPlan(
-            firestore,
-            mohaffez.id,
-            sessionTypeFilter: params.sessionTypeFilter,
-          );
-          return MapEntry(mohaffez.id, hasActivePlan);
-        }),
-      );
-      final activePlanById = Map.fromEntries(planEntries);
+      final bookabilityFutures = <Future<_TeacherBookability>>[
+        for (final mohaffez in mohaffezList)
+          ref.watch(
+            _teacherBookabilityProvider((
+              teacherId: mohaffez.id,
+              sessionType: params.sessionTypeFilter,
+            )).future,
+          ),
+      ];
+      final bookabilityResults = await Future.wait(bookabilityFutures);
+      final bookabilityById = <String, _TeacherBookability>{
+        for (var index = 0; index < mohaffezList.length; index++)
+          mohaffezList[index].id: bookabilityResults[index],
+      };
 
       mohaffezList = mohaffezList.where((mohaffez) {
-        final hasMatchingPlan = activePlanById[mohaffez.id] ?? false;
-        final isBookable = (slotById[mohaffez.id] ?? false) && hasMatchingPlan;
+        final bookability = bookabilityById[mohaffez.id];
+        final hasMatchingPlan = bookability?.hasMatchingPlan ?? false;
+        final isBookable =
+            (bookability?.hasAvailableSlot ?? false) && hasMatchingPlan;
 
         switch (params.availabilityFilter) {
           case TeacherAvailabilityFilter.availableOnly:
@@ -240,6 +296,10 @@ int _compareMohaffezResults(
   MohaffezModel b,
   NearbyParams params,
 ) {
+  final matchCompare =
+      _teacherMatchScore(b, params).compareTo(_teacherMatchScore(a, params));
+  if (matchCompare != 0) return matchCompare;
+
   final foundingCompare = _compareFoundingTeacherBadge(a, b);
   if (foundingCompare != 0) return foundingCompare;
 
@@ -254,6 +314,32 @@ int _compareMohaffezResults(
   if (ratingCompare != 0) return ratingCompare;
 
   return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+}
+
+bool _matchesExplicitDiscoveryFilters(
+  MohaffezModel teacher,
+  NearbyParams params,
+) {
+  final matchesExplicitFilters = teacher.matchesDiscoveryFilters(
+    service: params.teachingService,
+    learnerLevel: params.learnerLevel,
+    teachingLanguage: params.teachingLanguage,
+  );
+  if (!matchesExplicitFilters) return false;
+  if (!params.enforceAudienceMatching) return true;
+  return teacher.teachesAudience(
+    params.requiredLearnerAgeGroup,
+    params.requiredLearnerGender,
+    allowIncomplete: params.allowIncompleteTeacherAudience,
+  );
+}
+
+int _teacherMatchScore(MohaffezModel teacher, NearbyParams params) {
+  return teacher.discoveryMatchScore(
+    service: params.suggestedTeachingService,
+    learnerLevel: params.suggestedLearnerLevel,
+    teachingLanguage: params.suggestedTeachingLanguage,
+  );
 }
 
 int _compareFoundingTeacherBadge(MohaffezModel a, MohaffezModel b) {
@@ -309,6 +395,7 @@ bool _matchesMohaffezSearch(
       mohaffez.displayName,
       mohaffez.bio,
       mohaffez.specialization,
+      ...mohaffez.discoveryBadges(max: 12),
       mohaffez.addressText,
       _genderSearchAliases(mohaffez.gender),
       if (mohaffez.trialSessionEnabled)
@@ -338,6 +425,16 @@ class NearbyParams {
   final SortType sortBy;
   final String? searchQuery;
   final String? specialization;
+  final String? teachingService;
+  final String? requiredLearnerAgeGroup;
+  final String? requiredLearnerGender;
+  final bool enforceAudienceMatching;
+  final bool allowIncompleteTeacherAudience;
+  final String? learnerLevel;
+  final String? teachingLanguage;
+  final String? suggestedTeachingService;
+  final String? suggestedLearnerLevel;
+  final String? suggestedTeachingLanguage;
   final TeacherAvailabilityFilter availabilityFilter;
   final TeacherGenderFilter genderFilter;
   final TeacherTrialSessionFilter trialSessionFilter;
@@ -351,6 +448,16 @@ class NearbyParams {
     this.sortBy = SortType.distance,
     this.searchQuery,
     this.specialization,
+    this.teachingService,
+    this.requiredLearnerAgeGroup,
+    this.requiredLearnerGender,
+    this.enforceAudienceMatching = false,
+    this.allowIncompleteTeacherAudience = true,
+    this.learnerLevel,
+    this.teachingLanguage,
+    this.suggestedTeachingService,
+    this.suggestedLearnerLevel,
+    this.suggestedTeachingLanguage,
     this.availabilityFilter = TeacherAvailabilityFilter.availableOnly,
     this.genderFilter = TeacherGenderFilter.all,
     this.trialSessionFilter = TeacherTrialSessionFilter.all,
@@ -369,13 +476,24 @@ class NearbyParams {
           sortBy == other.sortBy &&
           searchQuery == other.searchQuery &&
           specialization == other.specialization &&
+          teachingService == other.teachingService &&
+          requiredLearnerAgeGroup == other.requiredLearnerAgeGroup &&
+          requiredLearnerGender == other.requiredLearnerGender &&
+          enforceAudienceMatching == other.enforceAudienceMatching &&
+          allowIncompleteTeacherAudience ==
+              other.allowIncompleteTeacherAudience &&
+          learnerLevel == other.learnerLevel &&
+          teachingLanguage == other.teachingLanguage &&
+          suggestedTeachingService == other.suggestedTeachingService &&
+          suggestedLearnerLevel == other.suggestedLearnerLevel &&
+          suggestedTeachingLanguage == other.suggestedTeachingLanguage &&
           availabilityFilter == other.availabilityFilter &&
           genderFilter == other.genderFilter &&
           trialSessionFilter == other.trialSessionFilter &&
           sessionTypeFilter == other.sessionTypeFilter;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         userLat,
         userLng,
         radiusKm,
@@ -383,11 +501,21 @@ class NearbyParams {
         sortBy,
         searchQuery,
         specialization,
+        teachingService,
+        requiredLearnerAgeGroup,
+        requiredLearnerGender,
+        enforceAudienceMatching,
+        allowIncompleteTeacherAudience,
+        learnerLevel,
+        teachingLanguage,
+        suggestedTeachingService,
+        suggestedLearnerLevel,
+        suggestedTeachingLanguage,
         availabilityFilter,
         genderFilter,
         trialSessionFilter,
         sessionTypeFilter,
-      );
+      ]);
 }
 
 enum SortType { distance, rating, followers }

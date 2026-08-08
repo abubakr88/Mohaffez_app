@@ -265,7 +265,9 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
                 borderRadius: QuizDS.r20,
                 border: Border.all(
                   color: _marked == null
-                      ? (_revealed ? typeColor.withValues(alpha: 0.4) : QuizDS.border)
+                      ? (_revealed
+                          ? typeColor.withValues(alpha: 0.4)
+                          : QuizDS.border)
                       : _marked!
                           ? QuizDS.green.withValues(alpha: 0.5)
                           : QuizDS.red.withValues(alpha: 0.5),
@@ -325,8 +327,7 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.touch_app_rounded,
-                            size: 14,
-                            color: typeColor.withValues(alpha: 0.7)),
+                            size: 14, color: typeColor.withValues(alpha: 0.7)),
                         const SizedBox(width: 6),
                         Text(
                           'اضغط للكشف',
@@ -452,6 +453,7 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
         ChallengeType.completeAyah => QuizDS.teal500,
         ChallengeType.nameSurah => QuizDS.amber,
         ChallengeType.tajweedRule => QuizDS.purple,
+        ChallengeType.orderAyahs => QuizDS.amber,
         ChallengeType.wordMeaning => QuizDS.blue,
         ChallengeType.openQuestion => QuizDS.green,
       };
@@ -460,6 +462,7 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
         ChallengeType.completeAyah => QuizDS.teal50,
         ChallengeType.nameSurah => QuizDS.amberBg,
         ChallengeType.tajweedRule => QuizDS.purpleBg,
+        ChallengeType.orderAyahs => QuizDS.amberBg,
         ChallengeType.wordMeaning => QuizDS.blueBg,
         ChallengeType.openQuestion => QuizDS.greenBg,
       };
