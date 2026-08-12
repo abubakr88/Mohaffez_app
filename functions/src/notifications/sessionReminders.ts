@@ -2,6 +2,60 @@ import * as functions from 'firebase-functions';
 
 import admin, { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import {
+  isValidTimeZone,
+  TEACHER_TIME_ZONE_ID,
+} from '../bookings/bookingTimeZone';
+
+type SessionDoc = FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>;
+
+async function reminderDocuments(
+  flag: 'reminder24hSent' | 'reminder1hSent',
+  lower: FirebaseFirestore.Timestamp,
+  upper: FirebaseFirestore.Timestamp,
+): Promise<SessionDoc[]> {
+  const base = db
+    .collection('hafizSessions')
+    .where('status', '==', 'accepted')
+    .where(flag, '==', false);
+  const [legacy, timeZoneAware] = await Promise.all([
+    base.where('sessionDate', '<=', upper).where('sessionDate', '>=', lower).get(),
+    base.where('slotStart', '<=', upper).where('slotStart', '>=', lower).get(),
+  ]);
+
+  const docs = new Map<string, SessionDoc>();
+  for (const doc of legacy.docs) {
+    if (doc.data().bookingTimeZoneVersion !== 1) docs.set(doc.id, doc);
+  }
+  for (const doc of timeZoneAware.docs) {
+    if (doc.data().bookingTimeZoneVersion === 1) docs.set(doc.id, doc);
+  }
+  return [...docs.values()];
+}
+
+async function userTimeZoneId(
+  userId: string,
+): Promise<string> {
+  const user = await db.collection('users').doc(userId).get();
+  const data = user.data() ?? {};
+  return isValidTimeZone(data.timeZoneId)
+    ? data.timeZoneId.trim()
+    : TEACHER_TIME_ZONE_ID;
+}
+
+function formatSessionInstant(
+  value: FirebaseFirestore.Timestamp,
+  timeZoneId: string,
+): string {
+  return new Intl.DateTimeFormat('ar-EG', {
+    timeZone: timeZoneId,
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(value.toDate());
+}
 
 async function logFailedOperation(
   sessionId: string,
@@ -34,15 +88,13 @@ export const sendSessionReminders = functions.pubsub
       new Date(nowMs + 2 * 60 * 60 * 1000)
     );
 
-    const twentyFourHourSnapshot = await db
-      .collection('hafizSessions')
-      .where('status', '==', 'accepted')
-      .where('reminder24hSent', '==', false)
-      .where('sessionDate', '<=', in24hUpper)
-      .where('sessionDate', '>=', in24hLower)
-      .get();
+    const twentyFourHourDocs = await reminderDocuments(
+      'reminder24hSent',
+      in24hLower,
+      in24hUpper,
+    );
 
-    for (const doc of twentyFourHourSnapshot.docs) {
+    for (const doc of twentyFourHourDocs) {
       try {
         const data = doc.data();
         const studentId = typeof data.studentId === 'string' ? data.studentId : '';
@@ -51,7 +103,7 @@ export const sendSessionReminders = functions.pubsub
           typeof data.mohaffezName === 'string' ? data.mohaffezName : 'المحفظ';
         const studentName =
           typeof data.studentName === 'string' ? data.studentName : 'الطالب';
-        const timeSlot =
+        let timeSlot =
           typeof data.preferredTimeSlot === 'string'
             ? data.preferredTimeSlot
             : typeof data.timeSlot === 'string'
@@ -86,6 +138,18 @@ export const sendSessionReminders = functions.pubsub
         }
 
         if (shouldSend24h) {
+          let teacherTimeSlot = timeSlot;
+          if (
+            data.bookingTimeZoneVersion === 1 &&
+            data.slotStart instanceof admin.firestore.Timestamp
+          ) {
+            const studentTimeZone = await userTimeZoneId(studentId);
+            timeSlot = formatSessionInstant(data.slotStart, studentTimeZone);
+            teacherTimeSlot = formatSessionInstant(
+              data.slotStart,
+              TEACHER_TIME_ZONE_ID,
+            );
+          }
           await createAndSendNotification({
             userId: studentId,
             senderId: mohaffezId,
@@ -99,6 +163,7 @@ export const sendSessionReminders = functions.pubsub
             },
           });
 
+          timeSlot = teacherTimeSlot;
           await createAndSendNotification({
             userId: mohaffezId,
             senderId: studentId,
@@ -122,15 +187,13 @@ export const sendSessionReminders = functions.pubsub
       }
     }
 
-    const oneHourSnapshot = await db
-      .collection('hafizSessions')
-      .where('status', '==', 'accepted')
-      .where('reminder1hSent', '==', false)
-      .where('sessionDate', '<=', in1hUpper)
-      .where('sessionDate', '>=', in1hLower)
-      .get();
+    const oneHourDocs = await reminderDocuments(
+      'reminder1hSent',
+      in1hLower,
+      in1hUpper,
+    );
 
-    for (const doc of oneHourSnapshot.docs) {
+    for (const doc of oneHourDocs) {
       try {
         const data = doc.data();
         const studentId = typeof data.studentId === 'string' ? data.studentId : '';
@@ -219,8 +282,8 @@ export const sendSessionReminders = functions.pubsub
     }
 
     functions.logger.info('Session reminders completed', {
-      sent24h: twentyFourHourSnapshot.size,
-      sent1h: oneHourSnapshot.size,
+      sent24h: twentyFourHourDocs.length,
+      sent1h: oneHourDocs.length,
     });
 
     return null;

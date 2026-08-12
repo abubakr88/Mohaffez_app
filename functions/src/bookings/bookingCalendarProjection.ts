@@ -12,6 +12,8 @@ const LIVE_REQUEST_STATUSES = [
 type CalendarTarget = {
   mohaffezId: string;
   slotDate: admin.firestore.Timestamp;
+  calendarDateId: string;
+  dateUtc: admin.firestore.Timestamp;
 };
 
 const CONFIG_CACHE_TTL_MS = 60 * 1000;
@@ -41,11 +43,30 @@ function targetFromRequest(
   if (!data || typeof data.mohaffezId !== 'string') return null;
   const slotDate = timestampValue(data.slotDate);
   if (!slotDate) return null;
-  return { mohaffezId: data.mohaffezId, slotDate };
+  const slotStart = timestampValue(data.slotStart);
+  const isTimeZoneBooking = data.bookingTimeZoneVersion === 1 &&
+    typeof data.teacherLocalDate === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(data.teacherLocalDate);
+  const startDate = slotStart?.toDate();
+  const dateUtc = isTimeZoneBooking && startDate
+    ? admin.firestore.Timestamp.fromDate(new Date(Date.UTC(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate(),
+      )))
+    : slotDate;
+  return {
+    mohaffezId: data.mohaffezId,
+    slotDate,
+    calendarDateId: isTimeZoneBooking
+      ? data.teacherLocalDate
+      : calendarDateId(slotDate),
+    dateUtc,
+  };
 }
 
 function targetKey(target: CalendarTarget): string {
-  return `${target.mohaffezId}:${target.slotDate.toMillis()}`;
+  return `${target.mohaffezId}:${target.calendarDateId}`;
 }
 
 function calendarDateId(slotDate: admin.firestore.Timestamp): string {
@@ -96,7 +117,7 @@ async function rebuildBookingCalendarDay(target: CalendarTarget) {
     .collection('users')
     .doc(target.mohaffezId)
     .collection('bookingCalendar')
-    .doc(calendarDateId(target.slotDate));
+    .doc(target.calendarDateId);
 
   if (intervals.length === 0) {
     await calendarRef.delete().catch((error: unknown) => {
@@ -110,7 +131,7 @@ async function rebuildBookingCalendarDay(target: CalendarTarget) {
   }
 
   await calendarRef.set({
-    dateUtc: target.slotDate,
+    dateUtc: target.dateUtc,
     intervals,
     intervalCount: intervals.length,
     updatedAt: FieldValue.serverTimestamp(),
@@ -125,15 +146,15 @@ async function rebuildBookingCalendarDay(target: CalendarTarget) {
 export const onSessionRequestBookingCalendarChanged = functions.firestore
   .document('sessionRequests/{requestId}')
   .onWrite(async (change) => {
-    if (!(await isVariablePlanDurationEnabled())) return;
+    const beforeData = change.before.exists ? change.before.data() : undefined;
+    const afterData = change.after.exists ? change.after.data() : undefined;
+    const hasTimeZoneBooking = beforeData?.bookingTimeZoneVersion === 1 ||
+      afterData?.bookingTimeZoneVersion === 1;
+    if (!hasTimeZoneBooking && !(await isVariablePlanDurationEnabled())) return;
 
     const targets = new Map<string, CalendarTarget>();
-    const before = targetFromRequest(
-      change.before.exists ? change.before.data() : undefined,
-    );
-    const after = targetFromRequest(
-      change.after.exists ? change.after.data() : undefined,
-    );
+    const before = targetFromRequest(beforeData);
+    const after = targetFromRequest(afterData);
     if (before) targets.set(targetKey(before), before);
     if (after) targets.set(targetKey(after), after);
 

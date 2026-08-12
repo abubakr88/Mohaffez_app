@@ -194,6 +194,17 @@ class _SelectBundlePlanScreenState
         'slotDate': slotCtx.slotDate,
         'slotStart': slotCtx.slotStart,
         'slotEnd': slotCtx.slotEnd,
+        if (slotCtx.bookingTimeZoneVersion == 1) ...{
+          'bookingTimeZoneVersion': 1,
+          'slotStartUtc': slotCtx.slotStart,
+          'slotEndUtc': slotCtx.slotEnd,
+          if (slotCtx.scheduleTimeZoneId != null)
+            'scheduleTimeZoneId': slotCtx.scheduleTimeZoneId,
+          if (slotCtx.teacherLocalDate != null)
+            'teacherLocalDate': slotCtx.teacherLocalDate,
+          if (slotCtx.teacherLocalTimeSlot != null)
+            'teacherLocalTimeSlot': slotCtx.teacherLocalTimeSlot,
+        },
         if (slotCtx.imamAddressText != null)
           'imamAddressText': slotCtx.imamAddressText,
         if (slotCtx.imamAddressLat != null)

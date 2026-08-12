@@ -19,6 +19,7 @@ import '../../providers/mohaffez_profile_providers.dart';
 import '../../providers/trial_session_provider.dart';
 import 'request_trial_session_sheet.dart';
 import '../../tour/tour_guard_helper.dart';
+import '../../tour/tour_mode_state.dart';
 
 String _teacherNameFromProfile(
   Map<String, dynamic> profile, {
@@ -223,15 +224,21 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
-    final modePlans = plans
+    final countryPlans = _plansForViewerCountry(plans);
+    return countryPlans
         .where((plan) =>
             selectedSessionType.isNotEmpty &&
             PricingCountryUtils.matchesMode(plan, selectedSessionType))
         .toList();
+  }
+
+  List<PricingPlanModel> _plansForViewerCountry(
+    List<PricingPlanModel> plans,
+  ) {
     final studentCountry = PricingCountryUtils.inferUserCountry(
-        ref.read(currentUserProvider).valueOrNull);
+        ref.watch(currentUserProvider).valueOrNull);
     return PricingCountryUtils.preferCountryPlans(
-      modePlans,
+      plans,
       studentCountry.code,
     );
   }
@@ -477,6 +484,39 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── SlotContext builder ──────────────────────────────────────────────────
 
   SlotContext _buildSlotContext(Map<String, dynamic>? profileValue) {
+    final bookingTimeZoneVersion =
+        (selectedTimeSlot!['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0;
+    if (bookingTimeZoneVersion == 1) {
+      final slotStartUtc = selectedTimeSlot!['slotStartUtc'] as String;
+      final slotEndUtc = selectedTimeSlot!['slotEndUtc'] as String;
+      final teacherLocalDate = selectedTimeSlot!['teacherLocalDate'] as String;
+      final teacherLocalTimeSlot =
+          selectedTimeSlot!['teacherLocalTimeSlot'] as String;
+      return SlotContext(
+        mohaffezId: widget.mohaffezId,
+        mohaffezName: profileValue == null
+            ? ''
+            : _teacherNameFromProfile(profileValue, fallback: ''),
+        mohaffezPhone: profileValue?['phoneNumber'] as String?,
+        isFoundingTeacher: profileValue?['status'] == 'active' &&
+            UserBadges.fromJson(profileValue?['badges'])
+                .foundingTeacher
+                .enabled,
+        sessionType: selectedSessionType,
+        preferredTimeSlot: teacherLocalTimeSlot,
+        slotDate: '${teacherLocalDate}T00:00:00.000Z',
+        slotStart: slotStartUtc,
+        slotEnd: slotEndUtc,
+        bookingTimeZoneVersion: 1,
+        scheduleTimeZoneId: selectedTimeSlot!['teacherTimeZoneId'] as String?,
+        teacherLocalDate: teacherLocalDate,
+        teacherLocalTimeSlot: teacherLocalTimeSlot,
+        availabilityDocId: selectedTimeSlot!['availabilityDocId'] as String?,
+        imamAddressText: profileValue?['addressText'] as String?,
+        imamAddressLat: (profileValue?['addressLat'] as num?)?.toDouble(),
+        imamAddressLng: (profileValue?['addressLng'] as num?)?.toDouble(),
+      );
+    }
     final startRaw = selectedTimeSlot!['startTime'] as String? ?? '0:0';
     final endRaw = selectedTimeSlot!['endTime'] as String? ?? '0:0';
 
@@ -2928,7 +2968,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Widget _buildModernSessionSelector(
     AsyncValue<List<PricingPlanModel>> plansAsync,
   ) {
-    final plans = plansAsync.valueOrNull ?? [];
+    final plans = _plansForViewerCountry(plansAsync.valueOrNull ?? const []);
 
     Widget item({
       required String type,
@@ -3175,6 +3215,306 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   Widget _buildModernAvailabilitySection(
+    WidgetRef ref,
+    Map<String, dynamic> profile,
+    AsyncValue<List<PricingPlanModel>> plansAsync, {
+    List<Map<String, dynamic>>? publicAvailability,
+  }) {
+    if (selectedSessionType.isEmpty ||
+        (!_isBundleBooking && selectedPricingPlan == null) ||
+        (_isBundleBooking && _bundleSubscription == null)) {
+      return const SizedBox.shrink();
+    }
+    if (ref.watch(tourModeProvider).active) {
+      return _buildLegacyAvailabilitySection(
+        ref,
+        profile,
+        plansAsync,
+        publicAvailability: publicAvailability,
+      );
+    }
+
+    final query = (
+      mohaffezId: widget.mohaffezId,
+      sessionType: selectedSessionType,
+      planId: _isBundleBooking ? null : selectedPricingPlan?.id,
+      subscriptionId: _isBundleBooking ? _bundleSubscription?.id : null,
+    );
+    final slotsAsync = ref.watch(availableBookingSlotsProvider(query));
+    return slotsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppThemeConstants.errorLight,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppThemeConstants.error),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, color: AppThemeConstants.error),
+              const SizedBox(height: 8),
+              const Text(
+                'تعذر تحميل المواعيد المتاحة. حاول مرة أخرى.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () =>
+                    ref.invalidate(availableBookingSlotsProvider(query)),
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (result) {
+        final groups =
+            <String, ({DateTime date, List<Map<String, dynamic>> slots})>{};
+        for (final raw in result.slots) {
+          final startUtc =
+              DateTime.tryParse(raw['slotStartUtc'] as String? ?? '');
+          final endUtc = DateTime.tryParse(raw['slotEndUtc'] as String? ?? '');
+          if (startUtc == null || endUtc == null) continue;
+          final start = startUtc.toLocal();
+          final end = endUtc.toLocal();
+          final key = DateFormat('yyyy-MM-dd').format(start);
+          final enriched = <String, dynamic>{
+            ...raw,
+            'bookingTimeZoneVersion': 1,
+            'startTime':
+                '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}',
+            'endTime':
+                '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}',
+          };
+          final existing = groups[key];
+          if (existing == null) {
+            groups[key] = (
+              date: DateTime(start.year, start.month, start.day),
+              slots: <Map<String, dynamic>>[enriched],
+            );
+          } else {
+            existing.slots.add(enriched);
+          }
+        }
+        final availableDays = groups.values.toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
+        for (final group in availableDays) {
+          group.slots.sort((a, b) => (a['slotStartUtc'] as String)
+              .compareTo(b['slotStartUtc'] as String));
+        }
+
+        if (availableDays.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppThemeConstants.grey200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded,
+                      color: AppThemeConstants.textSecondary),
+                  SizedBox(width: 12),
+                  Expanded(
+                      child: Text(
+                          'لا توجد مواعيد متاحة خلال الأيام السبعة القادمة.')),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final todayNow = serverNow(ref).toLocal();
+        final today = DateTime(todayNow.year, todayNow.month, todayNow.day);
+        final effectiveDate = selectedDate != null &&
+                availableDays.any((day) =>
+                    day.date.year == selectedDate!.year &&
+                    day.date.month == selectedDate!.month &&
+                    day.date.day == selectedDate!.day)
+            ? selectedDate!
+            : availableDays.first.date;
+        final activeSlots = availableDays
+            .firstWhere((day) =>
+                day.date.year == effectiveDate.year &&
+                day.date.month == effectiveDate.month &&
+                day.date.day == effectiveDate.day)
+            .slots;
+
+        String dayLabel(DateTime date) {
+          final diff = date.difference(today).inDays;
+          if (diff == 0) return 'اليوم';
+          if (diff == 1) return 'غداً';
+          return DateFormat('EEEE', 'ar').format(date);
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppThemeConstants.surface,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: AppThemeConstants.black.withValues(alpha: 0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _BookingStepTitle(
+                  number: 3,
+                  title: 'اختر الموعد',
+                  subtitle: 'حدد اليوم والوقت المناسب لك',
+                ),
+                const SizedBox(height: 10),
+                const Row(
+                  children: [
+                    Icon(Icons.public,
+                        size: 16, color: AppThemeConstants.primary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'المواعيد معروضة حسب توقيتك المحلي',
+                        style: TextStyle(
+                          color: AppThemeConstants.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 72,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: availableDays.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, index) {
+                      final day = availableDays[index];
+                      final selected = day.date.year == effectiveDate.year &&
+                          day.date.month == effectiveDate.month &&
+                          day.date.day == effectiveDate.day;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          selectedDate = day.date;
+                          selectedTimeSlot = null;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppThemeConstants.primary
+                                : AppThemeConstants.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: selected
+                                  ? AppThemeConstants.transparent
+                                  : AppThemeConstants.grey200,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                dayLabel(day.date),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: selected
+                                      ? AppThemeConstants.white
+                                      : AppThemeConstants.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                DateFormat('dd/MM', 'ar').format(day.date),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: selected
+                                      ? AppThemeConstants.white70
+                                      : AppThemeConstants.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: activeSlots.map((slot) {
+                    final startTime = slot['startTime'] as String;
+                    final endTime = slot['endTime'] as String;
+                    final selected = selectedTimeSlot?['slotStartUtc'] ==
+                        slot['slotStartUtc'];
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        selectedTimeSlot = slot;
+                        selectedDate = effectiveDate;
+                      }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppThemeConstants.primary
+                              : AppThemeConstants.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: selected
+                                ? AppThemeConstants.transparent
+                                : AppThemeConstants.grey200,
+                          ),
+                        ),
+                        child: Text(
+                          formatTimeToArabicAmPm('$startTime - $endTime'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? AppThemeConstants.white
+                                : AppThemeConstants.textPrimary,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegacyAvailabilitySection(
     WidgetRef ref,
     Map<String, dynamic> profile,
     AsyncValue<List<PricingPlanModel>> plansAsync, {

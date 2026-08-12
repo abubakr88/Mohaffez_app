@@ -92,6 +92,8 @@ PricingPlanModel _pricingPlanFromPublicMap(Map<String, dynamic> data) {
   final safeData = {
     ...data,
     'priceEGP': (data['priceEGP'] as num?)?.toDouble() ?? 0.0,
+    'displayPrice': (data['displayPrice'] as num?)?.toDouble(),
+    'fxRateToEGP': (data['fxRateToEGP'] as num?)?.toDouble() ?? 1.0,
     'sessionsCount': (data['sessionsCount'] as num?)?.toInt() ?? 0,
     'validityDays': (data['validityDays'] as num?)?.toInt(),
     'sessionsPerWeek': (data['sessionsPerWeek'] as num?)?.toInt(),
@@ -165,6 +167,49 @@ final availabilityProvider =
     });
   },
 );
+
+typedef AvailableSlotsQuery = ({
+  String mohaffezId,
+  String sessionType,
+  String? planId,
+  String? subscriptionId,
+});
+
+class AvailableSlotsResult {
+  final String teacherTimeZoneId;
+  final List<Map<String, dynamic>> slots;
+
+  const AvailableSlotsResult({
+    required this.teacherTimeZoneId,
+    required this.slots,
+  });
+}
+
+/// Returns concrete UTC slot occurrences produced and validated by the server.
+final availableBookingSlotsProvider = FutureProvider.autoDispose
+    .family<AvailableSlotsResult, AvailableSlotsQuery>((ref, query) async {
+  final callable = FirebaseFunctions.instance.httpsCallable(
+    'listAvailableSlots',
+    options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+  );
+  final response = await callable.call(<String, dynamic>{
+    'mohaffezId': query.mohaffezId,
+    'sessionType': query.sessionType,
+    if (query.planId != null && query.planId!.isNotEmpty)
+      'planId': query.planId,
+    if (query.subscriptionId != null && query.subscriptionId!.isNotEmpty)
+      'subscriptionId': query.subscriptionId,
+  });
+  final data = Map<String, dynamic>.from(response.data as Map);
+  final slots = (data['slots'] as List? ?? const <dynamic>[])
+      .whereType<Map>()
+      .map((slot) => Map<String, dynamic>.from(slot))
+      .toList();
+  return AvailableSlotsResult(
+    teacherTimeZoneId: data['teacherTimeZoneId'] as String? ?? '',
+    slots: slots,
+  );
+});
 
 /// PII-free occupied intervals for the nearby booking horizon. This is only a
 /// UI optimization; the booking Cloud Function remains the conflict authority.

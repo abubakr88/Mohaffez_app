@@ -127,7 +127,13 @@ async function computeAdminMetrics(): Promise<Omit<AdminMetrics, 'generatedAt'>>
   const paidLastMonth = 0;
 
   // ── SESSIONS ────────────────────────────────────────────────────────────
-  const [completedThisMonthAgg, completedLastMonthAgg, cancelledThisMonthAgg, pendingNowAgg] =
+  const [
+    completedThisMonthAgg,
+    completedLastMonthAgg,
+    cancelledThisMonthAgg,
+    pendingSessionsAgg,
+    pendingTrialRequestsAgg,
+  ] =
     await Promise.all([
       db
         .collection('hafizSessions')
@@ -150,7 +156,15 @@ async function computeAdminMetrics(): Promise<Omit<AdminMetrics, 'generatedAt'>>
         .get(),
       db
         .collection('hafizSessions')
-        .where('status', 'in', ['pending', 'accepted'])
+        .where('status', '==', 'pending')
+        .count()
+        .get(),
+      db
+        .collection('trialSessionRequests')
+        .where('status', 'in', [
+          'pending_teacher',
+          'awaiting_student_confirmation',
+        ])
         .count()
         .get(),
     ]);
@@ -218,7 +232,8 @@ async function computeAdminMetrics(): Promise<Omit<AdminMetrics, 'generatedAt'>>
       completedThisMonth: completedThisMonthAgg.data().count,
       completedLastMonth: completedLastMonthAgg.data().count,
       cancelledThisMonth: cancelledThisMonthAgg.data().count,
-      pendingNow: pendingNowAgg.data().count,
+      pendingNow:
+        pendingSessionsAgg.data().count + pendingTrialRequestsAgg.data().count,
     },
     subscriptions: {
       active: activeSubsAgg.data().count,

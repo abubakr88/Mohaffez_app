@@ -270,6 +270,15 @@ export const confirmBundleSession = functions.https.onCall(
         sessionDate:      sessionDateTs,
         slotStart:        slotStartTs,
         slotEnd:          slotEndTs,
+        ...(requestData.bookingTimeZoneVersion === 1
+          ? {
+              bookingTimeZoneVersion: 1,
+              scheduleTimeZoneId: requestData.scheduleTimeZoneId ?? null,
+              teacherLocalDate: requestData.teacherLocalDate ?? null,
+              teacherLocalTimeSlot:
+                requestData.teacherLocalTimeSlot ?? preferredTimeSlot,
+            }
+          : {}),
         location:         imamAddressText  ?? '',
         imamAddressText:  imamAddressText  ?? null,
         imamAddressLat:   imamAddressLat   ?? null,

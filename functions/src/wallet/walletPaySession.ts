@@ -197,6 +197,15 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       sessionDate: req.slotDate ?? sessionDate,
       slotStart: req.slotStart,
       slotEnd: req.slotEnd,
+      ...(req.bookingTimeZoneVersion === 1
+        ? {
+            bookingTimeZoneVersion: 1,
+            scheduleTimeZoneId: req.scheduleTimeZoneId ?? null,
+            teacherLocalDate: req.teacherLocalDate ?? null,
+            teacherLocalTimeSlot:
+              req.teacherLocalTimeSlot ?? req.preferredTimeSlot,
+          }
+        : {}),
       status: 'accepted',
       isPaid: true,
       sessionPrice: perSessionEgp,

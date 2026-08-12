@@ -553,6 +553,42 @@ final adminSessionsProvider = StreamProvider.autoDispose
           .toList());
 });
 
+/// Active trial-session requests shown alongside pending booked sessions.
+///
+/// This stays separate from [adminSessionsProvider] so Firestore only opens the
+/// extra collection listener when the admin explicitly views the pending queue.
+/// The limit protects the dashboard from unbounded reads; all data needed by
+/// the table is denormalized on the request, so this does not trigger user-doc
+/// lookups per row.
+final adminPendingTrialRequestsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, int>((ref, limit) {
+  return FirebaseFirestore.instance
+      .collection('trialSessionRequests')
+      .where(
+        'status',
+        whereIn: const [
+          'pending_teacher',
+          'awaiting_student_confirmation',
+        ],
+      )
+      .limit(limit)
+      .snapshots()
+      .map((snapshot) {
+        final requests = snapshot.docs
+            .map((doc) => <String, dynamic>{
+                  'id': doc.id,
+                  ...doc.data(),
+                  '_adminRowKind': 'trialRequest',
+                })
+            .toList();
+        requests.sort((a, b) => _compareTs(
+              b['proposedStart'] ?? b['createdAt'],
+              a['proposedStart'] ?? a['createdAt'],
+            ));
+        return requests;
+      });
+});
+
 int _compareTs(dynamic a, dynamic b) {
   DateTime? toDate(dynamic v) {
     if (v == null) return null;

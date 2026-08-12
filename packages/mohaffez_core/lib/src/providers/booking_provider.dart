@@ -130,6 +130,10 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     DateTime? studentProfileBirthDate,
     int? studentAge,
     int? sessionDurationMinutes,
+    int bookingTimeZoneVersion = 0,
+    String? scheduleTimeZoneId,
+    String? teacherLocalDate,
+    String? teacherLocalTimeSlot,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -159,6 +163,10 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
         sessionDurationMinutes: sessionDurationMinutes,
+        bookingTimeZoneVersion: bookingTimeZoneVersion,
+        scheduleTimeZoneId: scheduleTimeZoneId,
+        teacherLocalDate: teacherLocalDate,
+        teacherLocalTimeSlot: teacherLocalTimeSlot,
       );
 
       if (result.isSuccess) {
@@ -222,6 +230,10 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     DateTime? studentProfileBirthDate,
     int? studentAge,
     int? sessionDurationMinutes,
+    int bookingTimeZoneVersion = 0,
+    String? scheduleTimeZoneId,
+    String? teacherLocalDate,
+    String? teacherLocalTimeSlot,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -268,6 +280,10 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
         sessionDurationMinutes: sessionDurationMinutes,
+        bookingTimeZoneVersion: bookingTimeZoneVersion,
+        scheduleTimeZoneId: scheduleTimeZoneId,
+        teacherLocalDate: teacherLocalDate,
+        teacherLocalTimeSlot: teacherLocalTimeSlot,
       );
 
       if (result.isSuccess) {
@@ -400,6 +416,10 @@ class BookingService {
     DateTime? studentProfileBirthDate,
     int? studentAge,
     int? sessionDurationMinutes,
+    int bookingTimeZoneVersion = 0,
+    String? scheduleTimeZoneId,
+    String? teacherLocalDate,
+    String? teacherLocalTimeSlot,
   }) async {
     try {
       final authError = await _ensureAuthenticatedForCallable('FREE SESSION');
@@ -441,6 +461,16 @@ class BookingService {
         if (studentAge != null) 'studentAge': studentAge,
         if (sessionDurationMinutes != null)
           'sessionDurationMinutes': sessionDurationMinutes,
+        if (bookingTimeZoneVersion == 1) ...{
+          'bookingTimeZoneVersion': 1,
+          'slotStartUtc': slotStart.toUtc().toIso8601String(),
+          'slotEndUtc': slotEnd.toUtc().toIso8601String(),
+          if (scheduleTimeZoneId != null)
+            'scheduleTimeZoneId': scheduleTimeZoneId,
+          if (teacherLocalDate != null) 'teacherLocalDate': teacherLocalDate,
+          if (teacherLocalTimeSlot != null)
+            'teacherLocalTimeSlot': teacherLocalTimeSlot,
+        },
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
         'slotDate': slotDate.toUtc().toIso8601String(),
@@ -566,6 +596,10 @@ class BookingService {
     DateTime? studentProfileBirthDate,
     int? studentAge,
     int? sessionDurationMinutes,
+    int bookingTimeZoneVersion = 0,
+    String? scheduleTimeZoneId,
+    String? teacherLocalDate,
+    String? teacherLocalTimeSlot,
   }) async {
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
@@ -647,6 +681,16 @@ class BookingService {
         'planType': planType,
         if (sessionDurationMinutes != null)
           'sessionDurationMinutes': sessionDurationMinutes,
+        if (bookingTimeZoneVersion == 1) ...{
+          'bookingTimeZoneVersion': 1,
+          'slotStartUtc': slotStart.toUtc().toIso8601String(),
+          'slotEndUtc': slotEnd.toUtc().toIso8601String(),
+          if (scheduleTimeZoneId != null)
+            'scheduleTimeZoneId': scheduleTimeZoneId,
+          if (teacherLocalDate != null) 'teacherLocalDate': teacherLocalDate,
+          if (teacherLocalTimeSlot != null)
+            'teacherLocalTimeSlot': teacherLocalTimeSlot,
+        },
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 

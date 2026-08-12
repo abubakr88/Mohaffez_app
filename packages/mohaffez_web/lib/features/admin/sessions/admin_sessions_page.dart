@@ -47,6 +47,11 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
   Widget build(BuildContext context) {
     final metricsAsync = ref.watch(adminMetricsStreamProvider);
     final sessionsAsync = ref.watch(adminSessionsProvider(_filter));
+    // Trial requests are queried only for the pending queue to minimize reads.
+    final AsyncValue<List<Map<String, dynamic>>> trialRequestsAsync =
+        _filter == 'pending'
+            ? ref.watch(adminPendingTrialRequestsProvider(100))
+            : const AsyncValue.data(<Map<String, dynamic>>[]);
 
     return PageContainer(
       child: Column(
@@ -84,6 +89,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                   iconColor: m.sessions.pendingNow > 0
                       ? DSColors.warning
                       : DSColors.success,
+                  onTap: () => setState(() => _filter = 'pending'),
                 ),
                 DSStatCard(
                   label: 'منجزة هذا الشهر',
@@ -164,162 +170,181 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
             loading: () => const DSSkeletonCard(),
             error: (e, _) =>
                 DSBanner(message: '$e', variant: DSBannerVariant.error),
-            data: (all) {
-              final rows = _filter == null && _query.isEmpty
-                  ? all
-                  : all.where((s) {
-                      if (_query.isNotEmpty) {
-                        final q = _query.toLowerCase();
-                        final teacher =
-                            (s['mohaffezName'] as String? ?? '').toLowerCase();
-                        final student =
-                            (s['studentName'] as String? ?? '').toLowerCase();
-                        if (!teacher.contains(q) && !student.contains(q)) {
-                          return false;
-                        }
-                      }
-                      return true;
-                    }).toList();
-
-              if (rows.isEmpty) {
-                return const DSCard(
-                  child: DSEmptyState(
-                    title: 'لا توجد جلسات',
-                    subtitle: 'جرّب تغيير عوامل التصفية أو البحث',
-                    icon: Icons.calendar_today_outlined,
-                  ),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${rows.length} جلسة',
-                    style: DSText.caption(context, color: DSColors.text3),
-                  ),
-                  const SizedBox(height: DSSpacing.sm),
-                  DSDataTable<Map<String, dynamic>>(
-                    initialSortKey: 'date',
-                    columns: [
-                      DSColumnDef(
-                        key: 'date',
-                        label: 'التاريخ',
-                        width: 140,
-                        sortable: true,
-                        sortValue: (s) =>
-                            _ts(s['sessionDate'] ?? s['slotStart'])
-                                ?.millisecondsSinceEpoch ??
-                            0,
-                        cellBuilder: (ctx, s) {
-                          final dt = _ts(s['sessionDate'] ?? s['slotStart']);
-                          return Text(
-                            dt == null
-                                ? '—'
-                                : DateFormat('dd/MM/yyyy', 'ar').format(dt),
-                            style: DSText.body(ctx, color: DSColors.text2),
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'teacher',
-                        label: 'المحفظ',
-                        sortable: true,
-                        sortValue: (s) =>
-                            (s['mohaffezName'] as String? ?? '').toLowerCase(),
-                        cellBuilder: (ctx, s) {
-                          final name = s['mohaffezName'] as String? ?? '—';
-                          return Row(
-                            children: [
-                              DSAvatar(name: name, size: 28),
-                              const SizedBox(width: DSSpacing.sm),
-                              Flexible(
-                                child: Text(name,
-                                    style: DSText.bodyMedium(ctx),
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'student',
-                        label: 'الطالب',
-                        sortable: true,
-                        sortValue: (s) =>
-                            (s['studentName'] as String? ?? '').toLowerCase(),
-                        cellBuilder: (ctx, s) {
-                          final name = s['studentName'] as String? ?? '—';
-                          return Row(
-                            children: [
-                              DSAvatar(name: name, size: 28),
-                              const SizedBox(width: DSSpacing.sm),
-                              Flexible(
-                                child: Text(name,
-                                    style: DSText.body(ctx),
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'type',
-                        label: 'النوع',
-                        width: 110,
-                        cellBuilder: (ctx, s) {
-                          final t = s['sessionType'] as String? ?? '';
-                          return DSBadge(
-                            label: _typeLabel(t),
-                            variant: _typeVariant(t),
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'status',
-                        label: 'الحالة',
-                        width: 110,
-                        sortable: true,
-                        sortValue: (s) => s['status'] as String? ?? '',
-                        cellBuilder: (ctx, s) {
-                          final st = s['status'] as String? ?? '';
-                          return DSBadge(
-                            label: _statusLabel(st),
-                            variant: _statusVariant(st),
-                            dot: true,
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'price',
-                        label: 'السعر',
-                        width: 100,
-                        sortable: true,
-                        sortValue: (s) =>
-                            (s['sessionPrice'] as num?)?.toDouble() ?? 0.0,
-                        cellBuilder: (ctx, s) {
-                          final price = (s['sessionPrice'] as num?)?.toDouble();
-                          if (price == null || price == 0) {
-                            return Text('—',
-                                style: DSText.body(ctx, color: DSColors.text3));
+            data: (sessions) => trialRequestsAsync.when(
+              loading: () => const DSSkeletonCard(),
+              error: (e, _) =>
+                  DSBanner(message: '$e', variant: DSBannerVariant.error),
+              data: (trialRequests) {
+                final all = <Map<String, dynamic>>[
+                  ...sessions,
+                  ...trialRequests,
+                ]..sort((a, b) => (_rowDate(b)?.millisecondsSinceEpoch ?? 0)
+                    .compareTo(_rowDate(a)?.millisecondsSinceEpoch ?? 0));
+                final rows = _query.isEmpty
+                    ? all
+                    : all.where((s) {
+                        if (_query.isNotEmpty) {
+                          final q = _query.toLowerCase();
+                          final teacher = (s['mohaffezName'] as String? ?? '')
+                              .toLowerCase();
+                          final student =
+                              (s['studentName'] as String? ?? '').toLowerCase();
+                          if (!teacher.contains(q) && !student.contains(q)) {
+                            return false;
                           }
-                          return Text(
-                            _money(price),
-                            style: DSText.bodyMedium(ctx),
-                          );
-                        },
-                      ),
-                      DSColumnDef(
-                        key: 'actions',
-                        label: '',
-                        width: 120,
-                        cellBuilder: (ctx, s) => _RefundCell(session: s),
-                      ),
-                    ],
-                    rows: rows,
-                  ),
-                ],
-              );
-            },
+                        }
+                        return true;
+                      }).toList();
+
+                if (rows.isEmpty) {
+                  return const DSCard(
+                    child: DSEmptyState(
+                      title: 'لا توجد جلسات',
+                      subtitle: 'جرّب تغيير عوامل التصفية أو البحث',
+                      icon: Icons.calendar_today_outlined,
+                    ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _filter == 'pending'
+                          ? '${rows.length} جلسة أو طلب'
+                          : '${rows.length} جلسة',
+                      style: DSText.caption(context, color: DSColors.text3),
+                    ),
+                    const SizedBox(height: DSSpacing.sm),
+                    DSDataTable<Map<String, dynamic>>(
+                      initialSortKey: 'date',
+                      columns: [
+                        DSColumnDef(
+                          key: 'date',
+                          label: 'التاريخ',
+                          width: 140,
+                          sortable: true,
+                          sortValue: (s) =>
+                              _rowDate(s)?.millisecondsSinceEpoch ?? 0,
+                          cellBuilder: (ctx, s) {
+                            final dt = _rowDate(s);
+                            return Text(
+                              dt == null
+                                  ? '—'
+                                  : DateFormat('dd/MM/yyyy', 'ar').format(dt),
+                              style: DSText.body(ctx, color: DSColors.text2),
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'teacher',
+                          label: 'المحفظ',
+                          sortable: true,
+                          sortValue: (s) => (s['mohaffezName'] as String? ?? '')
+                              .toLowerCase(),
+                          cellBuilder: (ctx, s) {
+                            final name = s['mohaffezName'] as String? ?? '—';
+                            return Row(
+                              children: [
+                                DSAvatar(name: name, size: 28),
+                                const SizedBox(width: DSSpacing.sm),
+                                Flexible(
+                                  child: Text(name,
+                                      style: DSText.bodyMedium(ctx),
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'student',
+                          label: 'الطالب',
+                          sortable: true,
+                          sortValue: (s) =>
+                              (s['studentName'] as String? ?? '').toLowerCase(),
+                          cellBuilder: (ctx, s) {
+                            final name = s['studentName'] as String? ?? '—';
+                            return Row(
+                              children: [
+                                DSAvatar(name: name, size: 28),
+                                const SizedBox(width: DSSpacing.sm),
+                                Flexible(
+                                  child: Text(name,
+                                      style: DSText.body(ctx),
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'type',
+                          label: 'النوع',
+                          width: 150,
+                          cellBuilder: (ctx, s) {
+                            final t = s['sessionType'] as String? ?? '';
+                            return DSBadge(
+                              label: s['_adminRowKind'] == 'trialRequest'
+                                  ? 'تجريبية · ${_typeLabel(t)}'
+                                  : _typeLabel(t),
+                              variant: _typeVariant(t),
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'status',
+                          label: 'الحالة',
+                          width: 110,
+                          sortable: true,
+                          sortValue: (s) => s['status'] as String? ?? '',
+                          cellBuilder: (ctx, s) {
+                            final st = s['status'] as String? ?? '';
+                            return DSBadge(
+                              label: _statusLabel(st),
+                              variant: _statusVariant(st),
+                              dot: true,
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'price',
+                          label: 'السعر',
+                          width: 100,
+                          sortable: true,
+                          sortValue: (s) =>
+                              (s['sessionPrice'] as num?)?.toDouble() ?? 0.0,
+                          cellBuilder: (ctx, s) {
+                            final price =
+                                (s['sessionPrice'] as num?)?.toDouble();
+                            if (s['_adminRowKind'] == 'trialRequest') {
+                              return Text('مجانية',
+                                  style: DSText.bodyMedium(ctx,
+                                      color: DSColors.success));
+                            }
+                            if (price == null || price == 0) {
+                              return Text('—',
+                                  style:
+                                      DSText.body(ctx, color: DSColors.text3));
+                            }
+                            return Text(
+                              _money(price),
+                              style: DSText.bodyMedium(ctx),
+                            );
+                          },
+                        ),
+                        DSColumnDef(
+                          key: 'actions',
+                          label: '',
+                          width: 120,
+                          cellBuilder: (ctx, s) => _RefundCell(session: s),
+                        ),
+                      ],
+                      rows: rows,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -336,6 +361,13 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
     }
   }
 
+  static DateTime? _rowDate(Map<String, dynamic> row) => _ts(
+        row['slotStart'] ??
+            row['proposedStart'] ??
+            row['sessionDate'] ??
+            row['createdAt'],
+      );
+
   static String _intDelta(int current, int previous) {
     if (previous == 0) return '';
     final diff = current - previous;
@@ -347,6 +379,8 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
 
   static String _statusLabel(String s) => switch (s) {
         'pending' => 'انتظار',
+        'pending_teacher' => 'بانتظار المحفظ',
+        'awaiting_student_confirmation' => 'بانتظار تأكيد الطالب',
         'accepted' => 'مقبولة',
         'completed' => 'منجزة',
         'cancelled' => 'ملغاة',
@@ -356,6 +390,8 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
 
   static DSBadgeVariant _statusVariant(String s) => switch (s) {
         'pending' => DSBadgeVariant.warning,
+        'pending_teacher' => DSBadgeVariant.warning,
+        'awaiting_student_confirmation' => DSBadgeVariant.info,
         'accepted' => DSBadgeVariant.primary,
         'completed' => DSBadgeVariant.success,
         'cancelled' => DSBadgeVariant.error,

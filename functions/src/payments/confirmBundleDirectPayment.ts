@@ -474,6 +474,15 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             sessionDate: slotDateTs,
             slotStart: slotStartTs,
             slotEnd: slotEndTs,
+            ...(dp.bookingTimeZoneVersion === 1
+              ? {
+                  bookingTimeZoneVersion: 1,
+                  scheduleTimeZoneId: dp.scheduleTimeZoneId ?? null,
+                  teacherLocalDate: dp.teacherLocalDate ?? null,
+                  teacherLocalTimeSlot:
+                    dp.teacherLocalTimeSlot ?? preferredTimeSlot,
+                }
+              : {}),
             status: 'accepted',
             isPaid: true,
             paymentType: 'bundle',
@@ -544,6 +553,15 @@ export const confirmBundleDirectPayment = functions.https.onCall(
               slotDate: slotDateTs,
               slotStart: slotStartTs,
               slotEnd: slotEndTs,
+              ...(dp.bookingTimeZoneVersion === 1
+                ? {
+                    bookingTimeZoneVersion: 1,
+                    scheduleTimeZoneId: dp.scheduleTimeZoneId ?? null,
+                    teacherLocalDate: dp.teacherLocalDate ?? null,
+                    teacherLocalTimeSlot:
+                      dp.teacherLocalTimeSlot ?? preferredTimeSlot,
+                  }
+                : {}),
               status: 'accepted',
               notificationsAlreadySent: true,
               paymentType: 'bundle',

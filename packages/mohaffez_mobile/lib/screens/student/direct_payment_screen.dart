@@ -115,6 +115,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   DateTime? resolvedSlotDate;
   DateTime? resolvedSlotStart;
   DateTime? resolvedSlotEnd;
+  int resolvedBookingTimeZoneVersion = 0;
   String? resolvedImamAddressText;
   double? resolvedImamAddressLat;
   double? resolvedImamAddressLng;
@@ -208,6 +209,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     resolvedSessionType = widget.sessionType ?? slotContext?.sessionType;
     resolvedTimeSlot =
         widget.preferredTimeSlot ?? slotContext?.preferredTimeSlot;
+    resolvedBookingTimeZoneVersion = slotContext?.bookingTimeZoneVersion ?? 0;
     resolvedImamAddressText =
         widget.imamAddressText ?? slotContext?.imamAddressText;
     resolvedImamAddressLat =
@@ -304,6 +306,9 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         resolvedSlotStart ??= parse(d['slotStart']);
         resolvedSlotEnd ??= parse(d['slotEnd']);
         resolvedTimeSlot ??= d['preferredTimeSlot'] as String?;
+        resolvedBookingTimeZoneVersion =
+            (d['bookingTimeZoneVersion'] as num?)?.toInt() ??
+                resolvedBookingTimeZoneVersion;
         resolvedSessionType ??= d['sessionType'] as String?;
         resolvedAmount ??= (d['paymentAmount'] as num?)?.toDouble();
         _hydratedPlanId ??= d['planId'] as String?;
@@ -787,6 +792,17 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   // ── Cards ──────────────────────────────────────────────────────────────────
 
   Widget _buildSessionSummaryCard() {
+    final displayTime = formatCanonicalBookingTime(
+      bookingTimeZoneVersion: resolvedBookingTimeZoneVersion,
+      slotStart: resolvedSlotStart,
+      slotEnd: resolvedSlotEnd,
+      legacyTimeSlot: resolvedTimeSlot ?? '',
+    );
+    final displayDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: resolvedBookingTimeZoneVersion,
+      slotStart: resolvedSlotStart,
+      legacyDate: resolvedSlotDate,
+    );
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
@@ -815,7 +831,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             ],
 
             // LTR wrapper prevents RTL from flipping "07:00 - 07:45"
-            if (resolvedTimeSlot != null) ...[
+            if (displayTime.isNotEmpty) ...[
               const SizedBox(height: 6),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -831,7 +847,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   Expanded(
                     child: Directionality(
                       textDirection: TextDirection.ltr,
-                      child: Text(formatTimeToArabicAmPm(resolvedTimeSlot!),
+                      child: Text(displayTime,
                           style: const TextStyle(fontSize: 13)),
                     ),
                   ),
@@ -839,10 +855,10 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
               ),
             ],
 
-            if (resolvedSlotDate != null) ...[
+            if (displayDate != null) ...[
               const SizedBox(height: 6),
               _infoRow(Icons.calendar_today, 'التاريخ',
-                  '${resolvedSlotDate!.day}/${resolvedSlotDate!.month}/${resolvedSlotDate!.year}'),
+                  '${displayDate.day}/${displayDate.month}/${displayDate.year}'),
             ],
 
             if (resolvedImamAddressText != null &&

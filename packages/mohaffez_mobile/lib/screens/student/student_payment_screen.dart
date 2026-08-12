@@ -1249,9 +1249,21 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     if (details == null) return const SizedBox.shrink();
 
     final sessionType = details['sessionType'] as String?;
-    final slotDate = details['slotDate'] as Timestamp?;
-    final timeSlot = details['timeSlot'] as String? ??
-        details['preferredTimeSlot'] as String?;
+    final bookingTimeZoneVersion =
+        (details['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0;
+    final slotDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: bookingTimeZoneVersion,
+      slotStart: details['slotStart'],
+      legacyDate: details['slotDate'],
+    );
+    final timeSlot = canonicalBookingLocalTimeSlot(
+      bookingTimeZoneVersion: bookingTimeZoneVersion,
+      slotStart: details['slotStart'],
+      slotEnd: details['slotEnd'],
+      legacyTimeSlot: details['timeSlot'] as String? ??
+          details['preferredTimeSlot'] as String? ??
+          '',
+    );
     final location =
         details['location'] as String? ?? details['imamAddressText'] as String?;
 
@@ -1293,11 +1305,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           lockedDetailRow('المحفظ:', effectiveMohaffezName),
           lockedDetailRow(ArabicLabels.type, getSessionTypeArabic(sessionType)),
           if (slotDate != null)
-            lockedDetailRow(
-                ArabicLabels.date,
-                DateFormat('EEEE، dd MMMM yyyy', 'ar')
-                    .format(slotDate.toDate())),
-          if (timeSlot != null && timeSlot.isNotEmpty)
+            lockedDetailRow(ArabicLabels.date,
+                DateFormat('EEEE، dd MMMM yyyy', 'ar').format(slotDate)),
+          if (timeSlot.isNotEmpty)
             lockedDetailRow(
                 ArabicLabels.time, formatTimeToArabicAmPm(timeSlot)),
           if (lockedSessionType != 'online' &&
@@ -1700,6 +1710,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       double? lat;
       double? lng;
       String? phone;
+      var bookingTimeZoneVersion = 0;
+      String? scheduleTimeZoneId;
+      String? teacherLocalDate;
+      String? teacherLocalTimeSlot;
 
       if (widget.requestId != null) {
         final requestSnap = await FirebaseFirestore.instance
@@ -1715,6 +1729,25 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 ? slotDateRaw
                 : null;
         timeSlot = data['preferredTimeSlot'] as String?;
+        bookingTimeZoneVersion =
+            (data['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0;
+        scheduleTimeZoneId = data['scheduleTimeZoneId'] as String?;
+        teacherLocalDate = data['teacherLocalDate'] as String?;
+        teacherLocalTimeSlot = data['teacherLocalTimeSlot'] as String?;
+        if (bookingTimeZoneVersion == 1) {
+          final rawStart = data['slotStart'];
+          final rawEnd = data['slotEnd'];
+          slotStart = rawStart is Timestamp
+              ? rawStart.toDate()
+              : rawStart is DateTime
+                  ? rawStart
+                  : DateTime.tryParse(rawStart?.toString() ?? '');
+          slotEnd = rawEnd is Timestamp
+              ? rawEnd.toDate()
+              : rawEnd is DateTime
+                  ? rawEnd
+                  : DateTime.tryParse(rawEnd?.toString() ?? '');
+        }
         sessionType = data['sessionType'] as String?;
         location = data['imamAddressText'] as String?;
         lat = (data['imamAddressLat'] as num?)?.toDouble();
@@ -1735,32 +1768,43 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         lat = widget.mohaffezLat;
         lng = widget.mohaffezLng;
         phone = widget.mohaffezPhone;
+        final slotContext = ref.read(bookingFlowProvider).slotContext;
+        if (slotContext?.bookingTimeZoneVersion == 1) {
+          bookingTimeZoneVersion = 1;
+          scheduleTimeZoneId = slotContext!.scheduleTimeZoneId;
+          teacherLocalDate = slotContext.teacherLocalDate;
+          teacherLocalTimeSlot = slotContext.teacherLocalTimeSlot;
+          slotStart = DateTime.tryParse(slotContext.slotStart);
+          slotEnd = DateTime.tryParse(slotContext.slotEnd);
+        }
       }
 
       if (slotDate == null || timeSlot == null || sessionType == null) {
         throw Exception('بيانات الموعد غير مكتملة');
       }
 
-      final timeSlotParts = timeSlot.split('-');
-      final startParts = timeSlotParts.first.trim().split(':');
-      final endParts = timeSlotParts.length > 1
-          ? timeSlotParts.last.trim().split(':')
-          : startParts;
+      if (bookingTimeZoneVersion != 1 || slotStart == null || slotEnd == null) {
+        final timeSlotParts = timeSlot.split('-');
+        final startParts = timeSlotParts.first.trim().split(':');
+        final endParts = timeSlotParts.length > 1
+            ? timeSlotParts.last.trim().split(':')
+            : startParts;
 
-      slotStart = DateTime(
-        slotDate.year,
-        slotDate.month,
-        slotDate.day,
-        int.tryParse(startParts[0]) ?? 0,
-        int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
-      );
-      slotEnd = DateTime(
-        slotDate.year,
-        slotDate.month,
-        slotDate.day,
-        int.tryParse(endParts[0]) ?? 0,
-        int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0,
-      );
+        slotStart = DateTime(
+          slotDate.year,
+          slotDate.month,
+          slotDate.day,
+          int.tryParse(startParts[0]) ?? 0,
+          int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
+        );
+        slotEnd = DateTime(
+          slotDate.year,
+          slotDate.month,
+          slotDate.day,
+          int.tryParse(endParts[0]) ?? 0,
+          int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0,
+        );
+      }
 
       debugPrint(
           'FREE SESSION: date=$slotDate, slot=$timeSlot, type=$sessionType');
@@ -1831,6 +1875,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 promoCode: appliedPromoCode!.code,
                 requestId: widget.requestId,
                 paymentId: paymentResult.paymentId,
+                bookingTimeZoneVersion: bookingTimeZoneVersion,
+                scheduleTimeZoneId: scheduleTimeZoneId,
+                teacherLocalDate: teacherLocalDate,
+                teacherLocalTimeSlot: teacherLocalTimeSlot,
               );
 
       if (!mounted) return;

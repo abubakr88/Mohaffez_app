@@ -338,6 +338,7 @@ service cloud.firestore {
             'acceptingNewBookings',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
+            'timeZoneId', 'timeZoneSource', 'timeZoneUpdatedAt',
             // ── Setup account fields (one-time setup wizard) ──
             'setupCompleted', 'dateOfBirth', 'gender', 'city',
             'country', 'countryCode',
@@ -376,6 +377,17 @@ service cloud.firestore {
               request.resource.data.trialSessionDurationMinutes
                 in [15, 20, 30, 45, 60]
             )
+          )
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['timeZoneId', 'timeZoneSource'])
+          ||
+          (
+            request.resource.data.timeZoneId is string &&
+            request.resource.data.timeZoneId.size() > 0 &&
+            request.resource.data.timeZoneId.size() <= 100 &&
+            request.resource.data.timeZoneSource in ['device', 'manual']
           )
         ) &&
         (
@@ -704,15 +716,17 @@ service cloud.firestore {
     }
 
     match /trialSessionRequests/{requestId} {
-      allow get: if isAuthenticated() && (
-        resource == null ||
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId
-      );
-      allow list: if isAuthenticated() && (
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId
-      );
+      allow get: if (canManageUsers() || canManageFinance()) ||
+                    (isAuthenticated() && (
+                      resource == null ||
+                      request.auth.uid == resource.data.studentId ||
+                      request.auth.uid == resource.data.mohaffezId
+                    ));
+      allow list: if (canManageUsers() || canManageFinance()) ||
+                     (isAuthenticated() && (
+                       request.auth.uid == resource.data.studentId ||
+                       request.auth.uid == resource.data.mohaffezId
+                     ));
       allow create, update, delete: if false;
     }
 

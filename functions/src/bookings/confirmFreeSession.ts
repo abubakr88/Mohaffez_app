@@ -216,9 +216,9 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     });
     functions.logger.info("🔄 Transaction started");
 
-    const slotDateTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotDate));
-    const slotStartTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotStart));
-    const slotEndTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotEnd));
+    let slotDateTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotDate));
+    let slotStartTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotStart));
+    let slotEndTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotEnd));
 
     // ============================================
     // ✅ STEP 1: IDEMPOTENCY CHECK INSIDE TRANSACTION
@@ -313,6 +313,25 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     const existingRequestData = existingRequest.data()!;
+    const isTimeZoneBooking = existingRequestData.bookingTimeZoneVersion === 1;
+    const effectivePreferredTimeSlot = isTimeZoneBooking
+      ? optionalString(existingRequestData.teacherLocalTimeSlot) ??
+        optionalString(existingRequestData.preferredTimeSlot) ?? ''
+      : preferredTimeSlot;
+    if (isTimeZoneBooking) {
+      const trustedSlotDate = optionalTimestamp(existingRequestData.slotDate);
+      const trustedSlotStart = optionalTimestamp(existingRequestData.slotStart);
+      const trustedSlotEnd = optionalTimestamp(existingRequestData.slotEnd);
+      if (!trustedSlotDate || !trustedSlotStart || !trustedSlotEnd) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Ø¨ÙŠØ§Ù†Ø§Øª Ù…ÙˆØ¹Ø¯ Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙƒØªÙ…Ù„Ø©'
+        );
+      }
+      slotDateTimestamp = trustedSlotDate;
+      slotStartTimestamp = trustedSlotStart;
+      slotEndTimestamp = trustedSlotEnd;
+    }
 
     if (
       existingRequestData.studentId !== studentId ||
@@ -402,11 +421,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     const requestSlotDate = optionalTimestamp(existingRequestData.slotDate);
-    const requestMatchesSlot =
-      normalizeTimeSlot(existingRequestData.preferredTimeSlot ?? '') ===
-        normalizeTimeSlot(preferredTimeSlot) &&
-      existingRequestData.sessionType === sessionType &&
-      requestSlotDate?.toMillis() === slotDateTimestamp.toMillis();
+    const requestMatchesSlot = isTimeZoneBooking
+      ? existingRequestData.sessionType === sessionType
+      : normalizeTimeSlot(existingRequestData.preferredTimeSlot ?? '') ===
+          normalizeTimeSlot(preferredTimeSlot) &&
+        existingRequestData.sessionType === sessionType &&
+        requestSlotDate?.toMillis() === slotDateTimestamp.toMillis();
 
     if (!requestMatchesSlot) {
       functions.logger.error('confirmFreeSession: request slot mismatch', {
@@ -431,7 +451,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       .collection("hafizSessions")
       .where("mohaffezId", "==", mohaffezId)
       .where("sessionDate", "==", slotDateTimestamp)
-      .where("preferredTimeSlot", "==", preferredTimeSlot)
+      .where("preferredTimeSlot", "==", effectivePreferredTimeSlot)
       .where("status", "in", [STATUS.ACCEPTED, STATUS.PENDING]);
     
     const existingSessionsOnSlot = await transaction.get(existingSessionOnSlotQuery);
@@ -440,7 +460,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       functions.logger.error("❌ Slot already booked", {
         mohaffezId,
         slotDate,
-        preferredTimeSlot,
+        preferredTimeSlot: effectivePreferredTimeSlot,
         existingSessionId: existingSessionsOnSlot.docs[0].id,
       });
       throw new functions.https.HttpsError(
@@ -472,7 +492,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       const availabilityData = availabilityDoc.data();
       if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
         const timeSlots = availabilityData.timeSlots;
-        const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
+        const normalizedSlot = normalizeTimeSlot(effectivePreferredTimeSlot);
         
         let slotFound = false;
         let slotEnabled = false;
@@ -573,11 +593,20 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       imamAddressLat: imamAddressLat || null,
       imamAddressLng: imamAddressLng || null,
       imamAddressText: imamAddressText || null,
-      preferredTimeSlot,
-      timeSlot: preferredTimeSlot,
+      preferredTimeSlot: effectivePreferredTimeSlot,
+      timeSlot: effectivePreferredTimeSlot,
       sessionDate: slotDateTimestamp,
       slotStart: slotStartTimestamp,
       slotEnd: slotEndTimestamp,
+      ...(existingRequestData.bookingTimeZoneVersion === 1
+        ? {
+            bookingTimeZoneVersion: 1,
+            scheduleTimeZoneId: existingRequestData.scheduleTimeZoneId ?? null,
+            teacherLocalDate: existingRequestData.teacherLocalDate ?? null,
+            teacherLocalTimeSlot:
+              existingRequestData.teacherLocalTimeSlot ?? effectivePreferredTimeSlot,
+          }
+        : {}),
       status: STATUS.ACCEPTED,
       isPaid: true,
       sessionPrice: 0.0,
@@ -686,7 +715,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
             ? preferredProvider
             : null,
-        preferredTimeSlot,
+        preferredTimeSlot: effectivePreferredTimeSlot,
         slotDate: slotDateTimestamp,
         slotStart: slotStartTimestamp,
         slotEnd: slotEndTimestamp,
@@ -783,7 +812,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       const availabilityData = availabilityDoc.data();
       if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
         const timeSlots = availabilityData.timeSlots;
-        const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
+        const normalizedSlot = normalizeTimeSlot(effectivePreferredTimeSlot);
 
         const updatedSlots = timeSlots.map((slot: any) => {
           const slotTime = normalizeTimeSlot(`${slot.startTime}-${slot.endTime}`);

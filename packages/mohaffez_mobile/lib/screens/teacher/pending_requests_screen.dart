@@ -331,11 +331,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
 
     // Path A: bundle session uses existing subscription credit
     // Check selectedPaymentMethod OR planType for bundle/subscription
-    final bool isSubscriptionCredit = (selectedPaymentMethod ==
-                BookingPaymentMethod.bundleCredit.value ||
-            planType == 'bundle' ||
-            planType == 'subscription') &&
-        subscriptionId != null;
+    final bool isSubscriptionCredit =
+        (selectedPaymentMethod == BookingPaymentMethod.bundleCredit.value ||
+                planType == 'bundle' ||
+                planType == 'subscription') &&
+            subscriptionId != null;
 
     if (isSubscriptionCredit) {
       // FIX: removed subscriptionId parameter — CF reads it from Firestore.
@@ -784,13 +784,23 @@ class _PendingRequestCard extends ConsumerWidget {
     final planTitle = request['planTitle'] as String?;
     final isBundlePlan = planType == 'bundle' || planType == 'subscription';
 
-    DateTime? sessionDate;
     final dateField = request['sessionDate'] ?? request['slotDate'];
-    sessionDate = _asDateTime(dateField);
+    final bookingTimeZoneVersion =
+        (request['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0;
+    final sessionDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: bookingTimeZoneVersion,
+      slotStart: request['slotStart'],
+      legacyDate: dateField,
+    );
 
-    final timeSlot = request['preferredTimeSlot'] as String? ??
-        request['timeSlot'] as String? ??
-        '';
+    final timeSlot = canonicalBookingLocalTimeSlot(
+      bookingTimeZoneVersion: bookingTimeZoneVersion,
+      slotStart: request['slotStart'],
+      slotEnd: request['slotEnd'],
+      legacyTimeSlot: request['preferredTimeSlot'] as String? ??
+          request['timeSlot'] as String? ??
+          '',
+    );
 
     final isAwaitingPayment = status == RequestStatus.awaitingPayment;
     final isAwaitingDirectConfirm =
@@ -1105,13 +1115,4 @@ class _PendingRequestCard extends ConsumerWidget {
     );
   }
 
-  DateTime? _asDateTime(dynamic value) {
-    if (value is DateTime) return value;
-    try {
-      final maybeDate = (value as dynamic)?.toDate();
-      return maybeDate is DateTime ? maybeDate : null;
-    } catch (_) {
-      return null;
-    }
-  }
 }

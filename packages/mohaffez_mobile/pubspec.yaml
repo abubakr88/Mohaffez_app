@@ -96,6 +96,7 @@ dependencies:
 
   intl: ^0.20.0
   timeago: ^3.6.1
+  flutter_timezone: ^5.1.0
 
   
   table_calendar: ^3.0.9

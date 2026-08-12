@@ -184,8 +184,10 @@ class _AvailabilityManagementScreenState
         final timeSlots =
             List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
         final enabled = timeSlots.where((s) => s['enabled'] == true).toList();
-        final usesAvailabilityWindow = data['scheduleSchemaVersion'] == 2 &&
-            data['scheduleMode'] == 'availabilityWindows';
+        final schemaVersion =
+            (data['scheduleSchemaVersion'] as num?)?.toInt() ?? 1;
+        final usesAvailabilityWindow =
+            schemaVersion >= 2 && data['scheduleMode'] == 'availabilityWindows';
         if (!usesAvailabilityWindow && enabled.isEmpty) continue;
 
         enabled.sort((a, b) =>

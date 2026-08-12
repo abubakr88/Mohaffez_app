@@ -108,6 +108,7 @@ class _ConfirmBundleSessionScreenState
 
       // 6. Rebuild a SlotContext from the persisted fields
       final r = _loadedRequest!;
+      final rawRequest = doc.data()!;
 
       DateTime parseTs(dynamic ts) =>
           ts is Timestamp ? ts.toDate() : DateTime.parse(ts.toString());
@@ -127,6 +128,11 @@ class _ConfirmBundleSessionScreenState
         imamAddressLat: r.imamAddressLat,
         imamAddressLng: r.imamAddressLng,
         slotLockId: r.slotLockId,
+        bookingTimeZoneVersion:
+            (rawRequest['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+        scheduleTimeZoneId: rawRequest['scheduleTimeZoneId'] as String?,
+        teacherLocalDate: rawRequest['teacherLocalDate'] as String?,
+        teacherLocalTimeSlot: rawRequest['teacherLocalTimeSlot'] as String?,
       );
 
       // 7. Inject into provider and cache locally.
@@ -325,15 +331,19 @@ class _ConfirmBundleSessionScreenState
 
       // Look up the availability doc for the slot's weekday so the CF can
       // disable the time slot atomically when it accepts the request.
-      final availabilitySnap = await firestore
-          .collection('users')
-          .doc(slotContext.mohaffezId)
-          .collection('availability')
-          .where('dayOfWeek', isEqualTo: slotDate.weekday)
-          .limit(1)
-          .get();
-      final availabilityDocId =
-          availabilitySnap.docs.isEmpty ? null : availabilitySnap.docs.first.id;
+      String? availabilityDocId = slotContext.availabilityDocId;
+      if (availabilityDocId == null) {
+        final availabilitySnap = await firestore
+            .collection('users')
+            .doc(slotContext.mohaffezId)
+            .collection('availability')
+            .where('dayOfWeek', isEqualTo: slotDate.weekday)
+            .limit(1)
+            .get();
+        availabilityDocId = availabilitySnap.docs.isEmpty
+            ? null
+            : availabilitySnap.docs.first.id;
+      }
 
       final lockRef = firestore.collection('slotLocks').doc();
       slotLockId = lockRef.id;
@@ -395,6 +405,10 @@ class _ConfirmBundleSessionScreenState
         studentProfileBirthDate: activeProfile.dateOfBirth,
         studentAge: activeProfile.age,
         sessionDurationMinutes: sub.sessionDurationMinutes,
+        bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+        scheduleTimeZoneId: slotContext.scheduleTimeZoneId,
+        teacherLocalDate: slotContext.teacherLocalDate,
+        teacherLocalTimeSlot: slotContext.teacherLocalTimeSlot,
       );
 
       if (!mounted) return;
@@ -566,7 +580,11 @@ class _ConfirmBundleSessionScreenState
 
     DateTime? displayDate;
     try {
-      displayDate = DateTime.parse(slotContext.slotDate);
+      displayDate = canonicalBookingLocalDate(
+        bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+        slotStart: slotContext.slotStart,
+        legacyDate: slotContext.slotDate,
+      );
     } catch (e) {
       // Date parsing failed - displayDate will remain null and date row will be hidden
       // Consider logging this error for debugging in development
@@ -657,8 +675,16 @@ class _ConfirmBundleSessionScreenState
                   ArabicLabels.getSessionTypeLabel(slotContext.sessionType),
                 ),
                 const SizedBox(height: 8),
-                _infoRow(Icons.access_time, 'الوقت',
-                    formatTimeToArabicAmPm(slotContext.preferredTimeSlot)),
+                _infoRow(
+                  Icons.access_time,
+                  'الوقت',
+                  formatCanonicalBookingTime(
+                    bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+                    slotStart: slotContext.slotStart,
+                    slotEnd: slotContext.slotEnd,
+                    legacyTimeSlot: slotContext.preferredTimeSlot,
+                  ),
+                ),
                 if (displayDate != null) ...[
                   const SizedBox(height: 8),
                   _infoRow(

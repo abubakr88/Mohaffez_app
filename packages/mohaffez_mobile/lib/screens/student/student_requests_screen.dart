@@ -650,9 +650,12 @@ class _RequestCard extends StatelessWidget {
     final createdAt = request['createdAt'] is Timestamp
         ? (request['createdAt'] as Timestamp).toDate()
         : request['createdAt'] as DateTime?;
-    final slotDate = request['slotDate'] is Timestamp
-        ? (request['slotDate'] as Timestamp).toDate()
-        : request['slotDate'] as DateTime?;
+    final slotDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion:
+          (request['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+      slotStart: request['slotStart'],
+      legacyDate: request['slotDate'],
+    );
     final rejectionReason = request['rejectionReason'] as String?;
 
     final (statusText, statusColor, statusIcon) = _getStatusInfo(status);

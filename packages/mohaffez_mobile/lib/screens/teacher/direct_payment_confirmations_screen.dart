@@ -460,8 +460,13 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             separator: ' ',
           )
         : '–';
-    final sessionDateStr = p.sessionDate != null
-        ? DateFormat('EEEE d MMMM', 'ar').format(p.sessionDate!)
+    final localSessionDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: p.bookingTimeZoneVersion,
+      slotStart: p.slotStart,
+      legacyDate: p.sessionDate,
+    );
+    final sessionDateStr = localSessionDate != null
+        ? DateFormat('EEEE d MMMM', 'ar').format(localSessionDate)
         : null;
 
     return Card(
@@ -551,8 +556,16 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
             // ── Info rows ─────────────────────────────────────────────
             _row(Icons.payment, 'طريقة الدفع', method.label),
-            _row(Icons.schedule, 'الموعد',
-                formatTimeToArabicAmPm(p.preferredTimeSlot)),
+            _row(
+              Icons.schedule,
+              'الموعد',
+              formatCanonicalBookingTime(
+                bookingTimeZoneVersion: p.bookingTimeZoneVersion,
+                slotStart: p.slotStart,
+                slotEnd: p.slotEnd,
+                legacyTimeSlot: p.preferredTimeSlot,
+              ),
+            ),
             if (sessionDateStr != null)
               _row(Icons.calendar_today, 'تاريخ الجلسة', sessionDateStr),
             if (p.studentNote != null && p.studentNote!.isNotEmpty)

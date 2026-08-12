@@ -16,6 +16,11 @@ class SlotContext {
   final double? imamAddressLng;
   final String? imamAddressText;
   final String? slotLockId;
+  final int bookingTimeZoneVersion;
+  final String? scheduleTimeZoneId;
+  final String? teacherLocalDate;
+  final String? teacherLocalTimeSlot;
+  final String? availabilityDocId;
 
   const SlotContext({
     required this.mohaffezId,
@@ -32,6 +37,11 @@ class SlotContext {
     this.imamAddressLng,
     this.imamAddressText,
     this.slotLockId,
+    this.bookingTimeZoneVersion = 0,
+    this.scheduleTimeZoneId,
+    this.teacherLocalDate,
+    this.teacherLocalTimeSlot,
+    this.availabilityDocId,
   });
 
   SlotContext copyWith({
@@ -49,6 +59,11 @@ class SlotContext {
     double? imamAddressLng,
     String? imamAddressText,
     String? slotLockId,
+    int? bookingTimeZoneVersion,
+    String? scheduleTimeZoneId,
+    String? teacherLocalDate,
+    String? teacherLocalTimeSlot,
+    String? availabilityDocId,
   }) {
     return SlotContext(
       mohaffezId: mohaffezId ?? this.mohaffezId,
@@ -65,6 +80,12 @@ class SlotContext {
       imamAddressLng: imamAddressLng ?? this.imamAddressLng,
       imamAddressText: imamAddressText ?? this.imamAddressText,
       slotLockId: slotLockId ?? this.slotLockId,
+      bookingTimeZoneVersion:
+          bookingTimeZoneVersion ?? this.bookingTimeZoneVersion,
+      scheduleTimeZoneId: scheduleTimeZoneId ?? this.scheduleTimeZoneId,
+      teacherLocalDate: teacherLocalDate ?? this.teacherLocalDate,
+      teacherLocalTimeSlot: teacherLocalTimeSlot ?? this.teacherLocalTimeSlot,
+      availabilityDocId: availabilityDocId ?? this.availabilityDocId,
     );
   }
 
@@ -84,6 +105,12 @@ class SlotContext {
       'imamAddressLng': imamAddressLng,
       'imamAddressText': imamAddressText,
       if (slotLockId != null) 'slotLockId': slotLockId,
+      'bookingTimeZoneVersion': bookingTimeZoneVersion,
+      if (scheduleTimeZoneId != null) 'scheduleTimeZoneId': scheduleTimeZoneId,
+      if (teacherLocalDate != null) 'teacherLocalDate': teacherLocalDate,
+      if (teacherLocalTimeSlot != null)
+        'teacherLocalTimeSlot': teacherLocalTimeSlot,
+      if (availabilityDocId != null) 'availabilityDocId': availabilityDocId,
     };
   }
 }

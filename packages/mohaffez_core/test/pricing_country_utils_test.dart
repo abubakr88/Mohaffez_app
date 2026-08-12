@@ -34,4 +34,47 @@ void main() {
       );
     });
   });
+
+  group('preferCountryPlans', () {
+    PricingPlanModel plan({
+      required String id,
+      required String countryCode,
+      double? displayPrice,
+    }) {
+      return PricingPlanModel(
+        id: id,
+        mohaffezId: 'teacher-1',
+        title: 'Plan $id',
+        type: PlanType.single,
+        mode: SessionMode.online,
+        priceEGP: 100,
+        countryCode: countryCode,
+        displayPrice: displayPrice,
+        sessionsCount: 1,
+      );
+    }
+
+    test('returns only the viewer country variant', () {
+      final plans = [
+        plan(id: 'eg', countryCode: 'EG', displayPrice: 100),
+        plan(id: 'sa', countryCode: 'SA', displayPrice: 10),
+        plan(id: 'ae', countryCode: 'AE', displayPrice: 8),
+      ];
+
+      final result = PricingCountryUtils.preferCountryPlans(plans, 'SA');
+
+      expect(result.map((item) => item.id), ['sa']);
+    });
+
+    test('uses a legacy global plan only when no country variant exists', () {
+      final plans = [
+        plan(id: 'legacy', countryCode: 'EG'),
+        plan(id: 'eg-only', countryCode: 'EG', displayPrice: 100),
+      ];
+
+      final result = PricingCountryUtils.preferCountryPlans(plans, 'KW');
+
+      expect(result.map((item) => item.id), ['legacy']);
+    });
+  });
 }

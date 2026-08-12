@@ -270,8 +270,9 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     SessionModel session,
     String? precalculatedRefundPolicy,
   ) async {
-    final hoursUntilSession =
-        session.sessionDate!.difference(DateTime.now()).inHours;
+    final hoursUntilSession = (session.slotStart ?? session.sessionDate!)
+        .difference(DateTime.now())
+        .inHours;
 
     // Branch on role and bundle-vs-single:
     // - Bundle sessions never move money. Restored session credit (>3h) or
@@ -683,22 +684,37 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                             label: 'نوع الجلسة',
                             value: getSessionTypeLabel(session.sessionType),
                           ),
-                          if (session.preferredTimeSlot != null) ...[
+                          if (session.preferredTimeSlot != null ||
+                              session.slotStart != null) ...[
                             const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.access_time,
                               label: 'الوقت',
-                              value: formatTimeToArabicAmPm(
-                                  session.preferredTimeSlot!),
+                              value: formatCanonicalBookingTime(
+                                bookingTimeZoneVersion:
+                                    session.bookingTimeZoneVersion,
+                                slotStart: session.slotStart,
+                                slotEnd: session.slotEnd,
+                                legacyTimeSlot: session.preferredTimeSlot ?? '',
+                              ),
                             ),
                           ],
-                          if (session.sessionDate != null) ...[
+                          if (session.sessionDate != null ||
+                              session.slotStart != null) ...[
                             const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.calendar_today,
                               label: 'التاريخ',
-                              value: DateFormat('dd MMMM yyyy', 'ar')
-                                  .format(session.sessionDate!),
+                              value: DateFormat('dd MMMM yyyy', 'ar').format(
+                                canonicalBookingLocalDate(
+                                      bookingTimeZoneVersion:
+                                          session.bookingTimeZoneVersion,
+                                      slotStart: session.slotStart,
+                                      legacyDate: session.sessionDate,
+                                    ) ??
+                                    session.sessionDate ??
+                                    session.slotStart!,
+                              ),
                             ),
                           ],
                           if ((session.location ?? '').isNotEmpty) ...[

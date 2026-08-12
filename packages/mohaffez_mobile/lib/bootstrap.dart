@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,6 +16,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'app.dart';
 import 'services/notification_service.dart';
 import 'services/sound_service.dart';
+import 'services/time_zone_service.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
 
 Future<void> _runStartupStep(
@@ -115,6 +118,8 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
 
     await _runStartupStep('cache-service', CacheService.initialize);
     await _runStartupStep('sound-service', SoundService.initialize);
+    // Notification time-zone sync is best effort and must never delay startup.
+    unawaited(TimeZoneService.initialize());
 
     await _runStartupStep('stale-cache-cleanup', () async {
       final hasStaleData = CacheService.getUserId() != null &&

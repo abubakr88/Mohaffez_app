@@ -407,7 +407,11 @@ class _BookingSummaryBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = DateTime.tryParse(slotContext.slotDate);
+    final date = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+      slotStart: slotContext.slotStart,
+      legacyDate: slotContext.slotDate,
+    );
     final dateLabel = date == null
         ? slotContext.slotDate
         : '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
@@ -476,7 +480,12 @@ class _BookingSummaryBanner extends StatelessWidget {
                 ),
                 _BookingSummaryPill(
                   icon: Icons.access_time_rounded,
-                  label: formatTimeToArabicAmPm(slotContext.preferredTimeSlot),
+                  label: formatCanonicalBookingTime(
+                    bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+                    slotStart: slotContext.slotStart,
+                    slotEnd: slotContext.slotEnd,
+                    legacyTimeSlot: slotContext.preferredTimeSlot,
+                  ),
                 ),
                 _BookingSummaryPill(
                   icon: Icons.calendar_today_rounded,

@@ -26,6 +26,10 @@ class SessionRequestModel {
   final Timestamp? slotDate;
   final Timestamp? slotStart;
   final Timestamp? slotEnd;
+  final int bookingTimeZoneVersion;
+  final String? scheduleTimeZoneId;
+  final String? teacherLocalDate;
+  final String? teacherLocalTimeSlot;
   final String? imamAddressText;
   final double? imamAddressLat;
   final double? imamAddressLng;
@@ -100,6 +104,10 @@ class SessionRequestModel {
     this.slotDate,
     this.slotStart,
     this.slotEnd,
+    this.bookingTimeZoneVersion = 0,
+    this.scheduleTimeZoneId,
+    this.teacherLocalDate,
+    this.teacherLocalTimeSlot,
     this.imamAddressText,
     this.imamAddressLat,
     this.imamAddressLng,
@@ -199,6 +207,11 @@ class SessionRequestModel {
       slotDate: map['slotDate'] as Timestamp?,
       slotStart: map['slotStart'] as Timestamp?,
       slotEnd: map['slotEnd'] as Timestamp?,
+      bookingTimeZoneVersion:
+          (map['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+      scheduleTimeZoneId: map['scheduleTimeZoneId'] as String?,
+      teacherLocalDate: map['teacherLocalDate'] as String?,
+      teacherLocalTimeSlot: map['teacherLocalTimeSlot'] as String?,
       imamAddressText: map['imamAddressText'] as String?,
       imamAddressLat: toDouble(map['imamAddressLat']),
       imamAddressLng: toDouble(map['imamAddressLng']),
@@ -259,6 +272,13 @@ class SessionRequestModel {
         if (slotDate != null) 'slotDate': slotDate,
         if (slotStart != null) 'slotStart': slotStart,
         if (slotEnd != null) 'slotEnd': slotEnd,
+        if (bookingTimeZoneVersion > 0)
+          'bookingTimeZoneVersion': bookingTimeZoneVersion,
+        if (scheduleTimeZoneId != null)
+          'scheduleTimeZoneId': scheduleTimeZoneId,
+        if (teacherLocalDate != null) 'teacherLocalDate': teacherLocalDate,
+        if (teacherLocalTimeSlot != null)
+          'teacherLocalTimeSlot': teacherLocalTimeSlot,
         if (imamAddressText != null) 'imamAddressText': imamAddressText,
         if (imamAddressLat != null) 'imamAddressLat': imamAddressLat,
         if (imamAddressLng != null) 'imamAddressLng': imamAddressLng,
@@ -335,6 +355,10 @@ class SessionRequestModel {
         slotDate: slotDate,
         slotStart: slotStart,
         slotEnd: slotEnd,
+        bookingTimeZoneVersion: bookingTimeZoneVersion,
+        scheduleTimeZoneId: scheduleTimeZoneId,
+        teacherLocalDate: teacherLocalDate,
+        teacherLocalTimeSlot: teacherLocalTimeSlot,
         imamAddressText: imamAddressText,
         imamAddressLat: imamAddressLat,
         imamAddressLng: imamAddressLng,

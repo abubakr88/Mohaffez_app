@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import { db } from "./utils/admin";
+import { publicTeacherPricingPlan } from "./publicTeacherPricing";
 
 const MAX_PUBLIC_AVAILABILITY_DAYS = 14;
 
@@ -144,32 +145,6 @@ function publicCredential(
   };
 }
 
-function publicPricingPlan(
-  id: string,
-  data: FirebaseFirestore.DocumentData,
-): Record<string, unknown> {
-  return {
-    id,
-    mohaffezId: safeString(data.mohaffezId),
-    title: safeString(data.title) ?? "خطة سعر",
-    type: safeString(data.type) ?? "single",
-    mode: safeString(data.mode) ?? "online",
-    priceEGP: safeNumber(data.priceEGP),
-    sessionsCount: Math.max(0, Math.trunc(safeNumber(data.sessionsCount))),
-    sessionDurationMinutes:
-      typeof data.sessionDurationMinutes === "number"
-        ? Math.trunc(data.sessionDurationMinutes)
-        : null,
-    validityDays:
-      typeof data.validityDays === "number" ? data.validityDays : null,
-    sessionsPerWeek:
-      typeof data.sessionsPerWeek === "number" ? data.sessionsPerWeek : null,
-    isActive: true,
-    isFreeTrialAvailable: data.isFreeTrialAvailable === true,
-    description: safeString(data.description),
-  };
-}
-
 function publicAvailability(
   id: string,
   data: FirebaseFirestore.DocumentData,
@@ -255,7 +230,7 @@ export const getPublicTeacherProfile = functions.https.onCall(async (data) => {
 
   const plans = plansSnapshot.docs
     .filter((doc) => doc.data().isActive === true)
-    .map((doc) => publicPricingPlan(doc.id, doc.data()))
+    .map((doc) => publicTeacherPricingPlan(doc.id, doc.data()))
     .sort(
       (a, b) =>
         safeNumber(a.priceEGP as number | undefined) -
@@ -269,7 +244,7 @@ export const getPublicTeacherProfile = functions.https.onCall(async (data) => {
     availability: availabilitySnapshot.docs
       .map((doc) => publicAvailability(doc.id, doc.data()))
       .filter((day) => {
-        if (day.scheduleSchemaVersion === 2) {
+        if ((day.scheduleSchemaVersion as number) >= 2) {
           return Boolean(day.startTime) &&
             Boolean(day.endTime) &&
             (day.sessionTypes as unknown[]).length > 0;

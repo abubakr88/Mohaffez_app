@@ -30,6 +30,36 @@ DateTime? _parseSessionDateTime(DateTime? date, String? timeSlot) {
   return date;
 }
 
+DateTime? _timestampDate(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+String _displayTimeSlot(Map<String, dynamic> data) {
+  if ((data['bookingTimeZoneVersion'] as num?)?.toInt() == 1) {
+    final start = _timestampDate(data['slotStart'])?.toLocal();
+    final end = _timestampDate(data['slotEnd'])?.toLocal();
+    if (start != null && end != null) {
+      String clock(DateTime value) =>
+          '${value.hour.toString().padLeft(2, '0')}:'
+          '${value.minute.toString().padLeft(2, '0')}';
+      return '${clock(start)} - ${clock(end)}';
+    }
+  }
+  return data['preferredTimeSlot'] as String? ??
+      data['timeSlot'] as String? ??
+      '08:00';
+}
+
+DateTime? _displaySessionDate(Map<String, dynamic> data) {
+  if ((data['bookingTimeZoneVersion'] as num?)?.toInt() == 1) {
+    return _timestampDate(data['slotStart'])?.toLocal();
+  }
+  return _timestampDate(data['sessionDate']);
+}
+
 // ============================================================================
 // FILTER ENUM AND PROVIDER
 // ============================================================================
@@ -106,10 +136,11 @@ final acceptedStudentSessionsProvider =
               data['imamAddressText'] as String? ??
               '',
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'preferredTimeSlot': _displayTimeSlot(data),
+          'sessionDate': _displaySessionDate(data),
+          'slotStart': _timestampDate(data['slotStart'])?.toLocal(),
+          'slotEnd': _timestampDate(data['slotEnd'])?.toLocal(),
+          'bookingTimeZoneVersion': data['bookingTimeZoneVersion'] ?? 0,
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
           'sessionRating': data['sessionRating'] as int? ?? 0,
@@ -180,13 +211,17 @@ final upcomingSessionsProvider =
           'studentName': data['studentName'] as String? ?? '',
           'mohaffezName': data['mohaffezName'] as String? ?? '',
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
-          'sessionDate': _parseSessionDateTime(
-            (data['sessionDate'] as Timestamp?)?.toDate(),
-            data['preferredTimeSlot'] as String? ?? data['timeSlot'] as String?,
-          ),
+          'preferredTimeSlot': _displayTimeSlot(data),
+          'sessionDate': (data['bookingTimeZoneVersion'] as num?)?.toInt() == 1
+              ? _displaySessionDate(data)
+              : _parseSessionDateTime(
+                  (data['sessionDate'] as Timestamp?)?.toDate(),
+                  data['preferredTimeSlot'] as String? ??
+                      data['timeSlot'] as String?,
+                ),
+          'slotStart': _timestampDate(data['slotStart'])?.toLocal(),
+          'slotEnd': _timestampDate(data['slotEnd'])?.toLocal(),
+          'bookingTimeZoneVersion': data['bookingTimeZoneVersion'] ?? 0,
           'location': data['location'] as String? ??
               data['imamAddressText'] as String? ??
               '',
@@ -249,13 +284,17 @@ final studentUpcomingSessionsProvider =
               return <String, dynamic>{
                 ...data,
                 'id': doc.id,
-                'sessionDate': _parseSessionDateTime(
-                  (data['sessionDate'] as Timestamp?)?.toDate(),
-                  data['preferredTimeSlot'] as String? ??
-                      data['timeSlot'] as String?,
-                ),
-                'slotStart': (data['slotStart'] as Timestamp?)?.toDate(),
-                'slotEnd': (data['slotEnd'] as Timestamp?)?.toDate(),
+                'sessionDate':
+                    (data['bookingTimeZoneVersion'] as num?)?.toInt() == 1
+                        ? _displaySessionDate(data)
+                        : _parseSessionDateTime(
+                            (data['sessionDate'] as Timestamp?)?.toDate(),
+                            data['preferredTimeSlot'] as String? ??
+                                data['timeSlot'] as String?,
+                          ),
+                'preferredTimeSlot': _displayTimeSlot(data),
+                'slotStart': _timestampDate(data['slotStart'])?.toLocal(),
+                'slotEnd': _timestampDate(data['slotEnd'])?.toLocal(),
                 'mohaffezId': data['mohaffezId'] as String? ?? '',
                 'mohaffezName': data['mohaffezName'] as String? ?? '',
                 'studentId': data['studentId'] as String? ?? studentId,
@@ -328,12 +367,10 @@ final completedSessionsProvider =
           'studentName': data['studentName'] as String? ?? '',
           'studentId': data['studentId'] as String? ?? '',
           'mohaffezName': data['mohaffezName'] as String? ?? '',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'sessionDate': _displaySessionDate(data),
           'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
+          'preferredTimeSlot': _displayTimeSlot(data),
           'location': data['location'] as String? ??
               data['imamAddressText'] as String? ??
               '',
@@ -425,12 +462,10 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
           'id': doc.id,
           'studentName': data['studentName'] as String? ?? '',
           'studentId': data['studentId'] as String? ?? '',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'sessionDate': _displaySessionDate(data),
           'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
+          'preferredTimeSlot': _displayTimeSlot(data),
           'location': data['location'] as String? ??
               data['imamAddressText'] as String? ??
               '',
@@ -556,10 +591,8 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
               data['imamAddressText'] as String? ??
               '',
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'preferredTimeSlot': _displayTimeSlot(data),
+          'sessionDate': _displaySessionDate(data),
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
           'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
@@ -665,9 +698,10 @@ final studentRequestsFirstPageProvider =
                 'mohaffezName': data['mohaffezName'] as String? ?? '',
                 'mohaffezId': data['mohaffezId'] as String?,
                 'sessionType': data['sessionType'] as String? ?? '',
-                'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-                    data['timeSlot'] as String? ??
-                    '08:00',
+                'preferredTimeSlot': _displayTimeSlot(data),
+                'bookingTimeZoneVersion': data['bookingTimeZoneVersion'] ?? 0,
+                'slotStart': _timestampDate(data['slotStart'])?.toLocal(),
+                'slotEnd': _timestampDate(data['slotEnd'])?.toLocal(),
                 'status': data['status'] as String? ?? 'pending',
                 'createdAt': data['createdAt'] as Timestamp?,
                 'slotDate': data['slotDate'] as Timestamp?,

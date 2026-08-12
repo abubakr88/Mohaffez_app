@@ -107,8 +107,19 @@ class _BookingStatusContent extends StatelessWidget {
           guardianName: guardianName,
           mohaffezName: mohaffezName,
           sessionType: request['sessionType']?.toString() ?? '',
-          preferredTimeSlot: request['preferredTimeSlot']?.toString() ?? '',
-          slotDate: _asDateTime(request['slotDate']),
+          preferredTimeSlot: canonicalBookingLocalTimeSlot(
+            bookingTimeZoneVersion:
+                (request['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+            slotStart: request['slotStart'],
+            slotEnd: request['slotEnd'],
+            legacyTimeSlot: request['preferredTimeSlot']?.toString() ?? '',
+          ),
+          slotDate: canonicalBookingLocalDate(
+            bookingTimeZoneVersion:
+                (request['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+            slotStart: request['slotStart'],
+            legacyDate: request['slotDate'],
+          ),
           address: request['imamAddressText']?.toString(),
           planTitle: planTitle,
           amount: amount,
@@ -639,13 +650,6 @@ bool _stepReached(String status, String step) {
 
 String _normalizedStatus(Object? value) =>
     value?.toString().trim().toLowerCase() ?? 'pending';
-
-DateTime? _asDateTime(Object? value) {
-  if (value is Timestamp) return value.toDate();
-  if (value is DateTime) return value;
-  if (value is String) return DateTime.tryParse(value);
-  return null;
-}
 
 String _firstNonEmpty(List<Object?> values) {
   for (final value in values) {

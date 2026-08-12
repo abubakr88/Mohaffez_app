@@ -104,6 +104,17 @@ class _DirectBookingRequestScreenState
         'slotDate': slotContext.slotDate,
         'slotStart': slotContext.slotStart,
         'slotEnd': slotContext.slotEnd,
+        if (slotContext.bookingTimeZoneVersion == 1) ...{
+          'bookingTimeZoneVersion': 1,
+          'slotStartUtc': slotContext.slotStart,
+          'slotEndUtc': slotContext.slotEnd,
+          if (slotContext.scheduleTimeZoneId != null)
+            'scheduleTimeZoneId': slotContext.scheduleTimeZoneId,
+          if (slotContext.teacherLocalDate != null)
+            'teacherLocalDate': slotContext.teacherLocalDate,
+          if (slotContext.teacherLocalTimeSlot != null)
+            'teacherLocalTimeSlot': slotContext.teacherLocalTimeSlot,
+        },
         if (slotContext.imamAddressText?.isNotEmpty == true)
           'imamAddressText': slotContext.imamAddressText,
         if (slotContext.imamAddressLat != null)
@@ -280,7 +291,11 @@ class _DirectBookingRequestScreenState
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final DateTime? slotDate = DateTime.tryParse(slotContext.slotDate);
+    final DateTime? slotDate = canonicalBookingLocalDate(
+      bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+      slotStart: slotContext.slotStart,
+      legacyDate: slotContext.slotDate,
+    );
     final String dateStr = slotDate != null
         ? DateFormat('EEEE d MMMM yyyy', 'ar').format(slotDate)
         : slotContext.slotDate;
@@ -308,7 +323,12 @@ class _DirectBookingRequestScreenState
                 mohaffezName: slotContext.mohaffezName,
                 isFoundingTeacher: slotContext.isFoundingTeacher,
                 sessionType: slotContext.sessionType,
-                timeSlot: slotContext.preferredTimeSlot,
+                timeSlot: canonicalBookingLocalTimeSlot(
+                  bookingTimeZoneVersion: slotContext.bookingTimeZoneVersion,
+                  slotStart: slotContext.slotStart,
+                  slotEnd: slotContext.slotEnd,
+                  legacyTimeSlot: slotContext.preferredTimeSlot,
+                ),
                 dateStr: dateStr,
                 address: slotContext.imamAddressText,
               ),

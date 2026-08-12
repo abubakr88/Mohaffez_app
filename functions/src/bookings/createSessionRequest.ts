@@ -17,6 +17,12 @@ import {
   audienceAgeGroup,
   teacherAcceptsAudience,
 } from "../teacherAudiencePolicy";
+import {
+  minutesFromClock as zonedMinutesFromClock,
+  localDateTime,
+  TEACHER_TIME_ZONE_ID,
+  teacherLocalSnapshot,
+} from "./bookingTimeZone";
 
 const STATUS = {
   PENDING: "pending",
@@ -118,7 +124,10 @@ function normalizeTimeSlot(raw: string): string {
   return raw.replace(/\s/g, "").replace(/[\u2013\u2014]/g, "-");
 }
 
-function parseFlutterDate(iso: string): Date {
+function parseFlutterDate(iso: unknown): Date {
+  if (iso instanceof admin.firestore.Timestamp) return iso.toDate();
+  if (iso instanceof Date) return iso;
+  if (typeof iso !== "string") return new Date(Number.NaN);
   if (!iso.endsWith("Z") && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
     return new Date(iso + "Z");
   }
@@ -244,15 +253,15 @@ export const createSessionRequest = functions.https.onCall(
       studentProfileBirthDate,
     );
     // ── 3. Validate ────────────────────────────────────────────────────────
+    const isTimeZoneBooking = data.bookingTimeZoneVersion === 1;
     if (
       !mohaffezId ||
       !studentName ||
       !mohaffezName ||
       !sessionType ||
-      !preferredTimeSlot ||
-      !slotDate ||
-      !slotStart ||
-      !slotEnd
+      (isTimeZoneBooking
+        ? typeof data.slotStartUtc !== "string"
+        : !preferredTimeSlot || !slotDate || !slotStart || !slotEnd)
     ) {
       functions.logger.error("createSessionRequest: missing required fields", {
         studentId,
@@ -269,14 +278,28 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
-    const slotDateObj = parseFlutterDate(slotDate);
-    const slotStartObj = parseFlutterDate(slotStart);
-    const slotEndObj = parseFlutterDate(slotEnd);
+    const slotStartObj = parseFlutterDate(
+      isTimeZoneBooking && typeof data.slotStartUtc === "string"
+        ? data.slotStartUtc
+        : slotStart,
+    );
+    let slotDateObj = isTimeZoneBooking
+      ? new Date(Date.UTC(
+          slotStartObj.getUTCFullYear(),
+          slotStartObj.getUTCMonth(),
+          slotStartObj.getUTCDate(),
+        ))
+      : parseFlutterDate(slotDate);
+    const slotEndObj = parseFlutterDate(
+      isTimeZoneBooking && typeof data.slotEndUtc === "string"
+        ? data.slotEndUtc
+        : slotEnd,
+    );
 
     if (
-      isNaN(slotDateObj.getTime()) ||
       isNaN(slotStartObj.getTime()) ||
-      isNaN(slotEndObj.getTime())
+      (!isTimeZoneBooking &&
+        (isNaN(slotDateObj.getTime()) || isNaN(slotEndObj.getTime())))
     ) {
       functions.logger.error("createSessionRequest: invalid date values", {
         slotDate,
@@ -399,13 +422,18 @@ export const createSessionRequest = functions.https.onCall(
         null;
       let bookingCalendarRef: FirebaseFirestore.DocumentReference | null = null;
       let bookingCalendarIntervals: Record<string, unknown>[] = [];
+      let scheduleTimeZoneId: string | null = null;
+      let teacherLocalDate: string | null = null;
+      let teacherLocalTimeSlot: string | null = null;
+      let canonicalPreferredTimeSlot = preferredTimeSlot as string;
 
       const configSnap = await transaction.get(
         db.collection("systemConfig").doc("global"),
       );
       const systemConfig = configSnap.data() ?? {};
       const variablePlanDurationEnabled =
-        systemConfig.variablePlanSessionDurationEnabled === true;
+        systemConfig.variablePlanSessionDurationEnabled === true ||
+        isTimeZoneBooking;
 
       const teacherSnap = await transaction.get(
         db.collection("users").doc(mohaffezId),
@@ -483,8 +511,8 @@ export const createSessionRequest = functions.https.onCall(
             let changed = false;
 
             updatedSlots =
-              variablePlanDurationEnabled &&
-              availabilityData.scheduleSchemaVersion === 2
+              (variablePlanDurationEnabled || isTimeZoneBooking) &&
+              Number(availabilityData.scheduleSchemaVersion ?? 1) >= 2
                 ? null
                 : slots.map((slot) => {
                     const start =
@@ -510,8 +538,8 @@ export const createSessionRequest = functions.https.onCall(
 
             // FIXED: BUG-5 - Warn if slot disable was skipped due to mismatch
             if (
-              (!variablePlanDurationEnabled ||
-                availabilityData.scheduleSchemaVersion !== 2) &&
+              (!(variablePlanDurationEnabled || isTimeZoneBooking) ||
+                Number(availabilityData.scheduleSchemaVersion ?? 1) < 2) &&
               !changed
             ) {
               functions.logger.warn(
@@ -766,8 +794,9 @@ export const createSessionRequest = functions.https.onCall(
       );
       if (
         slotStartObj >= canonicalSlotEndObj ||
-        Math.abs(slotEndObj.getTime() - canonicalSlotEndObj.getTime()) >
-          60 * 1000
+        (!isTimeZoneBooking &&
+          Math.abs(slotEndObj.getTime() - canonicalSlotEndObj.getTime()) >
+            60 * 1000)
       ) {
         throw new functions.https.HttpsError(
           "invalid-argument",
@@ -775,9 +804,50 @@ export const createSessionRequest = functions.https.onCall(
         );
       }
 
+      if (isTimeZoneBooking) {
+        scheduleTimeZoneId = TEACHER_TIME_ZONE_ID;
+        if (slotStartObj.getTime() <= Date.now()) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "هذا الموعد انتهى. اختر موعداً آخر",
+          );
+        }
+        const localStart = teacherLocalSnapshot(slotStartObj, scheduleTimeZoneId);
+        const firstMatchingInstant = localDateTime(
+          localStart.localDate,
+          localStart.localTime,
+          scheduleTimeZoneId,
+        );
+        if (!firstMatchingInstant ||
+            firstMatchingInstant.getTime() !== slotStartObj.getTime()) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "الموعد لا يطابق اللحظة المعتمدة في توقيت المحفظ",
+          );
+        }
+        const localEnd = teacherLocalSnapshot(
+          canonicalSlotEndObj,
+          scheduleTimeZoneId,
+        );
+        if (localStart.localDate !== localEnd.localDate) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "الموعد يجب أن يبدأ وينتهي في اليوم نفسه حسب توقيت المحفظ",
+          );
+        }
+        teacherLocalDate = localStart.localDate;
+        teacherLocalTimeSlot = `${localStart.localTime} - ${localEnd.localTime}`;
+        canonicalPreferredTimeSlot = teacherLocalTimeSlot;
+        slotDateObj = new Date(`${teacherLocalDate}T00:00:00.000Z`);
+      }
+
       if (!availabilityData) {
-        const jsDay = slotDateObj.getUTCDay();
-        const dayOfWeek = jsDay === 0 ? 7 : jsDay;
+        const dayOfWeek = isTimeZoneBooking && scheduleTimeZoneId
+          ? teacherLocalSnapshot(slotStartObj, scheduleTimeZoneId).dayOfWeek
+          : (() => {
+              const jsDay = slotDateObj.getUTCDay();
+              return jsDay === 0 ? 7 : jsDay;
+            })();
         const availabilityQuery = db
           .collection("users")
           .doc(mohaffezId)
@@ -792,13 +862,18 @@ export const createSessionRequest = functions.https.onCall(
       }
 
       if (
-        variablePlanDurationEnabled &&
-        availabilityData?.scheduleSchemaVersion === 2
+        (variablePlanDurationEnabled || isTimeZoneBooking) &&
+        availabilityData != null &&
+        Number(availabilityData?.scheduleSchemaVersion ?? 1) >= 2
       ) {
         const availableTypes = Array.isArray(availabilityData.sessionTypes)
           ? availabilityData.sessionTypes
           : [];
-        const startMinutes = preferredStartMinutes(preferredTimeSlot);
+        const startMinutes = isTimeZoneBooking && scheduleTimeZoneId
+          ? zonedMinutesFromClock(
+              teacherLocalSnapshot(slotStartObj, scheduleTimeZoneId).localTime,
+            )
+          : preferredStartMinutes(preferredTimeSlot);
         const windowStart = minutesFromClock(availabilityData.startTime);
         const windowEnd = minutesFromClock(availabilityData.endTime);
         const interval = nonNegativeMinutes(
@@ -810,8 +885,13 @@ export const createSessionRequest = functions.https.onCall(
         const exclusions =
           availabilityData.generatedExclusionRanges ??
           availabilityData.exclusionRanges;
+        const expectedDayOfWeek = isTimeZoneBooking && scheduleTimeZoneId
+          ? teacherLocalSnapshot(slotStartObj, scheduleTimeZoneId).dayOfWeek
+          : null;
 
         if (
+          (expectedDayOfWeek !== null &&
+            availabilityData.dayOfWeek !== expectedDayOfWeek) ||
           !availableTypes.includes(sessionType) ||
           startMinutes === null ||
           endMinutes === null ||
@@ -820,7 +900,7 @@ export const createSessionRequest = functions.https.onCall(
           startMinutes < windowStart ||
           endMinutes > windowEnd ||
           interval <= 0 ||
-          startMinutes % interval !== 0 ||
+          (startMinutes - windowStart) % interval !== 0 ||
           rangeOverlapsClock(startMinutes, endMinutes, exclusions)
         ) {
           throw new functions.https.HttpsError(
@@ -831,6 +911,32 @@ export const createSessionRequest = functions.https.onCall(
       }
 
       // ── 4b. Conflict guard ─────────────────────────────────────────────
+      if (isTimeZoneBooking &&
+          Number(availabilityData?.scheduleSchemaVersion ?? 1) < 2) {
+        const rawSlots = Array.isArray(availabilityData?.timeSlots)
+          ? availabilityData.timeSlots
+          : [];
+        const expectedLegacySlot = normalizeTimeSlot(
+          canonicalPreferredTimeSlot,
+        );
+        const matchesLegacySlot = rawSlots.some((slot: unknown) => {
+          if (!slot || typeof slot !== "object") return false;
+          const value = slot as Record<string, unknown>;
+          if (value.enabled !== true || value.sessionType !== sessionType) {
+            return false;
+          }
+          return normalizeTimeSlot(
+            `${String(value.startTime ?? "")}-${String(value.endTime ?? "")}`,
+          ) === expectedLegacySlot;
+        });
+        if (!availabilityData || !matchesLegacySlot) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "الموعد غير متاح ضمن جدول المحفظ الحالي",
+          );
+        }
+      }
+
       // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
       // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
       // Read one deterministic document for the teacher/day before checking
@@ -839,8 +945,9 @@ export const createSessionRequest = functions.https.onCall(
       // overlap query was initially empty. The request query below remains the
       // source of truth; this document is only the transaction mutex and UI
       // projection.
-      if (variablePlanDurationEnabled) {
-        const calendarDateId = slotDateObj.toISOString().slice(0, 10);
+      if (variablePlanDurationEnabled || isTimeZoneBooking) {
+        const calendarDateId = teacherLocalDate ??
+          slotDateObj.toISOString().slice(0, 10);
         bookingCalendarRef = db
           .collection("users")
           .doc(mohaffezId)
@@ -879,7 +986,7 @@ export const createSessionRequest = functions.https.onCall(
 
       const conflictSnap = await transaction.get(conflictQuery);
 
-      const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
+      const normalizedSlot = normalizeTimeSlot(canonicalPreferredTimeSlot);
       let duplicate: FirebaseFirestore.QueryDocumentSnapshot | null = null;
       let conflictingRequest: FirebaseFirestore.QueryDocumentSnapshot | null =
         null;
@@ -963,6 +1070,23 @@ export const createSessionRequest = functions.https.onCall(
       }
 
       // ── 4c. Write sessionRequest ───────────────────────────────────────
+      const requestedReservedEnd = new Date(
+        canonicalSlotEndObj.getTime() + breakMinutesAfter * 60 * 1000,
+      );
+      const calendarConflict = bookingCalendarIntervals.some((interval) => {
+        const existingStart = timestampDate(interval.slotStart);
+        const existingEnd = timestampDate(interval.reservedUntil) ??
+          timestampDate(interval.slotEnd);
+        return existingStart !== null && existingEnd !== null &&
+          slotStartObj < existingEnd && existingStart < requestedReservedEnd;
+      });
+      if (calendarConflict) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          "الموعد لم يعد متاحاً. اختر موعداً آخر",
+        );
+      }
+
       const requestRef = db.collection("sessionRequests").doc();
 
       // FIX-TS6133: use destructured `subscriptionId` variable (not data.subscriptionId)
@@ -998,7 +1122,7 @@ export const createSessionRequest = functions.https.onCall(
           preferredProvider.length > 0
             ? preferredProvider
             : null,
-        preferredTimeSlot,
+        preferredTimeSlot: canonicalPreferredTimeSlot,
         slotDate: admin.firestore.Timestamp.fromDate(slotDateObj),
         slotStart: admin.firestore.Timestamp.fromDate(slotStartObj),
         slotEnd: admin.firestore.Timestamp.fromDate(canonicalSlotEndObj),
@@ -1022,10 +1146,17 @@ export const createSessionRequest = functions.https.onCall(
         sessionDurationMinutes,
         breakMinutesAfter,
         scheduleSchemaVersion:
-          variablePlanDurationEnabled &&
-          availabilityData?.scheduleSchemaVersion === 2
-            ? 2
+          typeof availabilityData?.scheduleSchemaVersion === "number"
+            ? Math.trunc(availabilityData.scheduleSchemaVersion)
             : 1,
+        ...(isTimeZoneBooking
+          ? {
+              bookingTimeZoneVersion: 1,
+              scheduleTimeZoneId,
+              teacherLocalDate,
+              teacherLocalTimeSlot,
+            }
+          : {}),
         studentCountryCode:
           typeof data.studentCountryCode === "string"
             ? data.studentCountryCode
@@ -1092,7 +1223,15 @@ export const createSessionRequest = functions.https.onCall(
         transaction.set(
           bookingCalendarRef,
           {
-            dateUtc: admin.firestore.Timestamp.fromDate(slotDateObj),
+            dateUtc: admin.firestore.Timestamp.fromDate(
+              isTimeZoneBooking
+                ? new Date(Date.UTC(
+                    slotStartObj.getUTCFullYear(),
+                    slotStartObj.getUTCMonth(),
+                    slotStartObj.getUTCDate(),
+                  ))
+                : slotDateObj,
+            ),
             intervals: nextIntervals,
             intervalCount: nextIntervals.length,
             updatedAt: FieldValue.serverTimestamp(),

@@ -174,6 +174,27 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       }
 
       const reqData = reqSnap.data()!;
+      if (reqData.studentId !== studentId || reqData.mohaffezId !== mohaffezId) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Session request does not belong to these users',
+        );
+      }
+      const isTimeZoneBooking = reqData.bookingTimeZoneVersion === 1;
+      const canonicalTimeSlot = isTimeZoneBooking
+        ? optionalString(reqData.teacherLocalTimeSlot) ??
+          optionalString(reqData.preferredTimeSlot) ??
+          ''
+        : preferredTimeSlot;
+      const bookingTimeZoneSnapshot = reqData.bookingTimeZoneVersion === 1
+        ? {
+            bookingTimeZoneVersion: 1,
+            scheduleTimeZoneId: reqData.scheduleTimeZoneId ?? null,
+            teacherLocalDate: reqData.teacherLocalDate ?? null,
+            teacherLocalTimeSlot:
+              reqData.teacherLocalTimeSlot ?? reqData.preferredTimeSlot ?? null,
+          }
+        : {};
       const authoritativeSessionDuration =
         compatibleSessionDuration(reqData.sessionDurationMinutes) ??
         compatibleSessionDuration(sessionDurationMinutes) ??
@@ -249,16 +270,27 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           : 0;
       const commissionRate = Math.min(baseRate + penaltyPct / 100, 1.0);
 
-      const parsedSlotDate  = parseFlutterDate(slotDate  as string);
-      const parsedSlotStart = parseFlutterDate(slotStart as string);
-      const requestedSlotEnd = parseFlutterDate(slotEnd as string);
-      const parsedSlotEnd = new Date(
-        parsedSlotStart.getTime() + authoritativeSessionDuration * 60 * 1000,
-      );
-      if (
-        !Number.isFinite(requestedSlotEnd.getTime()) ||
-        Math.abs(requestedSlotEnd.getTime() - parsedSlotEnd.getTime()) > 60 * 1000
-      ) {
+      const parsedSlotDate = isTimeZoneBooking
+        ? optionalTimestamp(reqData.slotDate)?.toDate() ?? new Date(Number.NaN)
+        : parseFlutterDate(slotDate as string);
+      const parsedSlotStart = isTimeZoneBooking
+        ? optionalTimestamp(reqData.slotStart)?.toDate() ?? new Date(Number.NaN)
+        : parseFlutterDate(slotStart as string);
+      const requestedSlotEnd = isTimeZoneBooking
+        ? optionalTimestamp(reqData.slotEnd)?.toDate() ?? new Date(Number.NaN)
+        : parseFlutterDate(slotEnd as string);
+      const parsedSlotEnd = isTimeZoneBooking
+        ? requestedSlotEnd
+        : new Date(
+            parsedSlotStart.getTime() +
+              authoritativeSessionDuration * 60 * 1000,
+          );
+      if (!Number.isFinite(parsedSlotDate.getTime()) ||
+          !Number.isFinite(parsedSlotStart.getTime()) ||
+          !Number.isFinite(parsedSlotEnd.getTime()) ||
+          (!isTimeZoneBooking &&
+            Math.abs(requestedSlotEnd.getTime() - parsedSlotEnd.getTime()) >
+              60 * 1000)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Selected slot no longer matches the booking duration',
@@ -281,7 +313,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         id: newLockRef.id,
         mohaffezId,
         slotDate: admin.firestore.Timestamp.fromDate(parsedSlotDate),
-        timeSlot: preferredTimeSlot,
+        timeSlot: canonicalTimeSlot,
         sessionType,
         lockedBy: studentId,
         lockedAt: FieldValue.serverTimestamp(),
@@ -308,10 +340,11 @@ export const studentMarkedDirectPayment = functions.https.onCall(
             sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
               ? preferredProvider
               : null,
-          preferredTimeSlot,
+          preferredTimeSlot: canonicalTimeSlot,
           slotDate:  admin.firestore.Timestamp.fromDate(parsedSlotDate),
           slotStart: admin.firestore.Timestamp.fromDate(parsedSlotStart),
           slotEnd:   admin.firestore.Timestamp.fromDate(parsedSlotEnd),
+          ...bookingTimeZoneSnapshot,
           planType:       finalPlanType,
           planId:         finalPlanId,
           planTitle:      finalPlanTitle,
@@ -364,10 +397,11 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
             ? preferredProvider
             : null,
-        preferredTimeSlot,
+        preferredTimeSlot: canonicalTimeSlot,
         sessionDate: admin.firestore.Timestamp.fromDate(parsedSlotDate),
         slotStart:   admin.firestore.Timestamp.fromDate(parsedSlotStart),
         slotEnd:     admin.firestore.Timestamp.fromDate(parsedSlotEnd),
+        ...bookingTimeZoneSnapshot,
         imamAddressText: imamAddressText ?? null,
         imamAddressLat:  imamAddressLat  ?? null,
         imamAddressLng:  imamAddressLng  ?? null,
@@ -678,6 +712,20 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           sessionDate,
           slotStart,
           slotEnd,
+          ...(reqData.bookingTimeZoneVersion === 1 ||
+              dp.bookingTimeZoneVersion === 1
+            ? {
+                bookingTimeZoneVersion: 1,
+                scheduleTimeZoneId:
+                  reqData.scheduleTimeZoneId ?? dp.scheduleTimeZoneId ?? null,
+                teacherLocalDate:
+                  reqData.teacherLocalDate ?? dp.teacherLocalDate ?? null,
+                teacherLocalTimeSlot:
+                  reqData.teacherLocalTimeSlot ??
+                  dp.teacherLocalTimeSlot ??
+                  preferredTimeSlot,
+              }
+            : {}),
           status:              'accepted',
           isPaid:              true,
           sessionPrice:        sessionAmount,

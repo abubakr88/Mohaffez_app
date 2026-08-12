@@ -11,21 +11,21 @@ enum DirectPaymentMethod {
   wePay;
 
   String get label => switch (this) {
-        DirectPaymentMethod.instapay     => 'InstaPay',
+        DirectPaymentMethod.instapay => 'InstaPay',
         DirectPaymentMethod.vodafoneCash => 'فودافون كاش',
-        DirectPaymentMethod.orangeMoney  => 'أورنج موني',
+        DirectPaymentMethod.orangeMoney => 'أورنج موني',
         DirectPaymentMethod.etisalatCash => 'اتصالات كاش',
-        DirectPaymentMethod.wePay        => 'WE Pay',
+        DirectPaymentMethod.wePay => 'WE Pay',
       };
 
   // These MUST match the keys in users/{id}.walletNumbers in Firestore
   // and the keys saved by saveMohaffezWalletNumbers()
   String get value => switch (this) {
-        DirectPaymentMethod.instapay     => 'instapay',
+        DirectPaymentMethod.instapay => 'instapay',
         DirectPaymentMethod.vodafoneCash => 'vodafonecash',
-        DirectPaymentMethod.orangeMoney  => 'orangemoney',
+        DirectPaymentMethod.orangeMoney => 'orangemoney',
         DirectPaymentMethod.etisalatCash => 'etisalatcash',
-        DirectPaymentMethod.wePay        => 'wepay',
+        DirectPaymentMethod.wePay => 'wepay',
       };
 
   static DirectPaymentMethod fromValue(String v) =>
@@ -66,6 +66,10 @@ class DirectPaymentModel {
   final String? slotDate;
   final String? slotStart;
   final String? slotEnd;
+  final int bookingTimeZoneVersion;
+  final String? scheduleTimeZoneId;
+  final String? teacherLocalDate;
+  final String? teacherLocalTimeSlot;
 
   const DirectPaymentModel({
     required this.id,
@@ -97,6 +101,10 @@ class DirectPaymentModel {
     this.slotDate,
     this.slotStart,
     this.slotEnd,
+    this.bookingTimeZoneVersion = 0,
+    this.scheduleTimeZoneId,
+    this.teacherLocalDate,
+    this.teacherLocalTimeSlot,
   });
 
   factory DirectPaymentModel.fromFirestore(DocumentSnapshot doc) {
@@ -139,37 +147,41 @@ class DirectPaymentModel {
     }
 
     return DirectPaymentModel(
-      id:                  doc.id,
+      id: doc.id,
       // FIX BUG-NEW-2
-      sessionRequestId:    d['sessionRequestId']   as String?,
-      studentId:           d['studentId']          ?? '',
-      studentName:         d['studentName']        ?? '',
-      mohaffezId:          d['mohaffezId']         ?? '',
-      mohaffezName:        d['mohaffezName']       ?? '',
-      amount:              (d['amount']            as num?)?.toDouble() ?? 0,
-      commissionAmount:    (d['commissionAmount']  as num?)?.toDouble() ?? 0,
-      commissionRate:      (d['commissionRate']    as num?)?.toDouble() ?? 0.05,
-      sessionType:         d['sessionType']        ?? '',
-      preferredTimeSlot:   d['preferredTimeSlot']  ?? '',
-      sessionDate:         parseTs(d['sessionDate']),
-      paymentMethod:       d['paymentMethod']      ?? '',
-      studentNote:         d['studentNote'],
-      sessionId:           d['sessionId'],
-      status:              parseStatus(d['status']),
-      studentConfirmedAt:  parseTs(d['studentConfirmedAt']),
+      sessionRequestId: d['sessionRequestId'] as String?,
+      studentId: d['studentId'] ?? '',
+      studentName: d['studentName'] ?? '',
+      mohaffezId: d['mohaffezId'] ?? '',
+      mohaffezName: d['mohaffezName'] ?? '',
+      amount: (d['amount'] as num?)?.toDouble() ?? 0,
+      commissionAmount: (d['commissionAmount'] as num?)?.toDouble() ?? 0,
+      commissionRate: (d['commissionRate'] as num?)?.toDouble() ?? 0.05,
+      sessionType: d['sessionType'] ?? '',
+      preferredTimeSlot: d['preferredTimeSlot'] ?? '',
+      sessionDate: parseTs(d['sessionDate']),
+      paymentMethod: d['paymentMethod'] ?? '',
+      studentNote: d['studentNote'],
+      sessionId: d['sessionId'],
+      status: parseStatus(d['status']),
+      studentConfirmedAt: parseTs(d['studentConfirmedAt']),
       mohaffezConfirmedAt: parseTs(d['mohaffezConfirmedAt']),
-      createdAt:           parseTs(d['createdAt']),
+      createdAt: parseTs(d['createdAt']),
       // BUG-2+3 FIX: Parse bundle fields
-      planType:            d['planType'],
-      planId:              d['planId'],
-      planTitle:           d['planTitle'],
-      sessionsCount:       d['sessionsCount'] as int?,
-      validityDays:        d['validityDays']  as int?,
+      planType: d['planType'],
+      planId: d['planId'],
+      planTitle: d['planTitle'],
+      sessionsCount: d['sessionsCount'] as int?,
+      validityDays: d['validityDays'] as int?,
       // FIX: was `d['slotDate'] as String?` — crashes when CF writes Timestamp
-      slotDate:            tsToIso(d['slotDate']),
-      slotStart:           tsToIso(d['slotStart']),
-      slotEnd:             tsToIso(d['slotEnd']),
+      slotDate: tsToIso(d['slotDate']),
+      slotStart: tsToIso(d['slotStart']),
+      slotEnd: tsToIso(d['slotEnd']),
+      bookingTimeZoneVersion:
+          (d['bookingTimeZoneVersion'] as num?)?.toInt() ?? 0,
+      scheduleTimeZoneId: d['scheduleTimeZoneId'] as String?,
+      teacherLocalDate: d['teacherLocalDate'] as String?,
+      teacherLocalTimeSlot: d['teacherLocalTimeSlot'] as String?,
     );
   }
 }
-

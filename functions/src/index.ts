@@ -32,6 +32,7 @@ export { releaseExpiredSlotLocks } from "./cleanup/releaseExpiredSlotLocks";
 
 export { confirmFreeSession } from "./bookings/confirmFreeSession";
 export { createSessionRequest } from "./bookings/createSessionRequest";
+export { listAvailableSlots } from "./bookings/listAvailableSlots";
 export { onSessionRequestBookingCalendarChanged } from "./bookings/bookingCalendarProjection";
 export {
   createTrialSessionRequest,
